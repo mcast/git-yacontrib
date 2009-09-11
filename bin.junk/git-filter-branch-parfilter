@@ -1,0 +1,20 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+my $in = join "", <>; # " -p $par1 -p $par2\n"
+my $id = $ENV{GIT_COMMIT};
+
+my %add_parent = # old_commit_id => extra_parent
+  qw(
+ b6eeaac841e299dd2b19badd36f16094d3b171eb 35265b34d81b8b43d5481989b3b041534dcd204c
+);
+
+if (!$add_parent{$id}) {
+    print $in;
+} else {
+#    warn "\n\n\nid=$id\n\$in=($in)\n\n";
+    chomp $in;
+    print "$in -p $add_parent{$id}\n";
+}
