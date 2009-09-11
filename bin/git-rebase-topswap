@@ -1,0 +1,87 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use File::Temp 'tempfile';
+
+
+=head1 NAME
+
+git-rebase-topswap - reverse most recent pair of revisions
+
+
+=head1 SYNOPSIS
+
+ git-rebase-topswap
+
+ git-rebase-topswap --editor <filename>
+
+
+=head1 DESCRIPTION
+
+Defines itself as EDITOR and calls C<git-rebase -i HEAD^^>.
+
+This is useful if you were planning to amend the last commit, but have
+just buried it with another commit.
+
+
+=head1 CAVEATS
+
+Note that a pair of swaps is not a null operation (unless you do it
+real fast?) because the Committer: header will be different.
+
+
+=head1 AUTHOR
+
+ Copyright (c) 2009 Genome Research Ltd.
+ Author: Matthew Astley <mca@sanger.ac.uk>
+
+=cut
+
+
+if (@ARGV && "--editor" eq $ARGV[0]) {
+    # We have been called back via $ENV{EDITOR}
+    shift @ARGV;
+    editor();
+
+    # If we fail, it would be polite to "git-rebase --abort"
+
+} elsif (@ARGV) { # || grep /^(-h|--help)$/, @ARGV) {
+    # --help
+    die "Syntax: $0 <args>*\n\nCalls 'git-rebase -i <args>*'\n";
+
+} else {
+    # git-rebase does the work
+    $ENV{EDITOR} = "$0 --editor";
+    exec("git-rebase", -i => "HEAD^^");
+    die "Whoops, git-rebase failed: $!";
+}
+
+
+sub editor {
+    die "Expected to edit one file? (@ARGV)" unless 1 == @ARGV;
+
+    my $JUNK_RE = qr{^\s*(#|$)};
+    my $PICK_RE = qr{^pick\s+[0-9a-f]{6,40}\s+};
+
+    my ($fn) = @ARGV;
+    my @in_orig = <>;
+    my @in = grep { $_ !~ $JUNK_RE } @in_orig;
+
+    # Precondition check
+    die join "  |", "Unexpected input (not all 'pick's)\n", @in
+      if grep { $_ !~ $PICK_RE } @in;
+
+    # Permute as required
+#    warn join "  |", "Input\n", @in;
+    die join "  |", "Not enough input?\n", @in if @in < 2;
+    (@in[-1, -2]) = (@in[-2, -1]); # swap last two
+#    warn join "  |", "Output\n", @in;
+
+    # Write output and replace
+    my ($fh, $new_fn) = tempfile("$fn.XXXXXX");
+    print {$fh} @in;
+    close $fh;
+
+    rename($new_fn, $fn) or die "rename($new_fn, $fn): $!";
+}
