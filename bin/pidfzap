@@ -53,6 +53,7 @@ my %opt = (verbose => 1,
 	   kill => undef);
 
 my %pidf; # key = state, value = \@pidf_objects
+my $PIDFILE_RE = qr{\.pid$|/pid-file$};
 
 sub main {
     File::PidFile->__ps_sanity; # OK on Linux; other OSes will need more code
@@ -74,11 +75,12 @@ sub wanted {
     local $_; # protect against callees' changes
 
     return unless -f _;
-    return unless $path =~ m{\.pid$};
+    return unless $path =~ $PIDFILE_RE;
     my @lstat = lstat(_);
 
     my $pidf = File::PidFile->new(path => $path, uid => $lstat[4]);
-    my $state = $pidf->state;
+    my $state = eval { $pidf->state } || "error";
+    warn "$@" if $@;
     push @{ $pidf{$state} }, $pidf;
 }
 
@@ -142,8 +144,9 @@ sub pid {
 	# Opened OK
 	croak "File $fn: too long to be a pidfile" if 100 < -s $fh;
 	my $txt = do { local $/; <$fh> }; # slurp all
+	my $len = length($txt);
 	$txt =~ s/[\n\r]*\z//;
-	croak "File $fn: contents are not a pid"
+	croak "File $fn: contents ($len bytes) are not a pid"
 	  unless $txt =~ m{^([0-9]{1,12})$}; # don't assume the 16 bit limit will persist
 	return $1; # untainted
     } else {
