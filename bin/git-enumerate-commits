@@ -1,0 +1,30 @@
+#! /bin/sh
+
+showhelp() {
+    cat <<HELP >&2
+Usage: $0 <dir>*
+
+For each directory (defaulting to current directory), list git
+commit-ids reachable from all references.
+
+HELP
+    exit 1
+}
+
+# Would benefit from a flag to avoid printing directories that other users don't have access to...
+
+
+# Digest args
+if [[ $# == 0 ]]; then
+    DIRS=.
+elif [ "$1" == "--help" ]; then
+    showhelp
+else
+    DIRS=$*
+fi
+
+
+for DIR in $DIRS; do
+    ( cd $DIR && git log --topo-order --pretty=tformat:%H%x09%ai --all ) | \
+	perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
+done

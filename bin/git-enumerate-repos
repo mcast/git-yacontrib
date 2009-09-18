@@ -1,0 +1,126 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+
+=head1 NAME
+
+git-enumerate-repos - trundle a filesystem for git repositories
+
+
+=head1 SYNOPSIS
+
+ git-enumerate-repos <dir>+
+
+
+=head1 DESCRIPTION
+
+Recurse the specified director(y|ies) and list on STDOUT all Git
+working copies (lists the C<PROJ/.git>) or bare repositories (lists
+the C<PROJ.git>).
+
+Looks for directories containing both C<objects/> and C<refs/> or
+C<packed-refs>.
+
+
+=head1 CAVEATS
+
+There may be other tools that can do this.  Gitweb has something with
+a similar set of rules and a limit on recursion depth.
+
+
+=head1 AUTHOR
+
+ Copyright (c) 2009 Genome Research Ltd.
+ Author: Matthew Astley <mca@sanger.ac.uk>
+
+This file is part of "mca-wtsi/scripts".
+
+"mca-wtsi/scripts" is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+
+sub main {
+    local $SIG{__WARN__} = sub { warn "Warning: @_" }; # decorate the warnings from find
+
+    dirs_add(@ARGV);
+    while (dir_scan()) {}
+}
+
+{
+    my @dirstack;
+
+    sub dirs_add {
+	push @dirstack, @_;
+    }
+
+    sub dirs_next {
+	return @dirstack ? shift @dirstack : undef;
+    }
+}
+
+sub dir_scan {
+    my $dir = dirs_next();
+    return 0 unless defined $dir;
+
+    my @leaf;
+    if (opendir my $dh, $dir) {
+	@leaf = readdir $dh;
+	closedir $dh;
+    } else {
+	warn "$dir: cannot opendir, $!\n";
+	return 1;
+    }
+
+    my @subdir;
+    my %gitish; # key = leaf, value = bitfield
+    # objects/ && ( refs/ || packed-refs )
+
+    foreach my $leaf (@leaf) {
+	next if $leaf eq '.' || $leaf eq '..';
+	my $fn = "$dir/$leaf"; # Unix!!
+	my @lstat = lstat($fn);
+	if (!@lstat) {
+	    warn "$fn: lstat failed, $!\n";
+	    next;
+	}
+	if (-l _) {
+#	    warn "$fn: ignored symlink\n";
+	} elsif (-f _) {
+	    $gitish{$leaf} = 1 if $leaf eq 'packed-refs';
+	} elsif (-d _) {
+	    push @subdir, $fn;
+	    $gitish{$leaf} = 1 if $leaf eq 'refs';
+	    $gitish{$leaf} = 2 if $leaf eq 'objects';
+	}
+	# else : ignore sockets, pipes and devices
+    }
+
+    my $bitf = 0;
+    while (my ($k, $v) = each %gitish) { $bitf |= $v }
+
+    if ($bitf == 3) {
+	# found one
+	print "$dir\n";
+    } else {
+	# else recurse
+	dirs_add(@subdir);
+    }
+
+    return 1;
+}
+
+main();
