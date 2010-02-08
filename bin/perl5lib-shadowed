@@ -1,0 +1,251 @@
+#! /usr/bin/perl
+
+# package main is below
+
+package IncScan;
+use strict;
+use warnings;
+
+use Module::Info; # from CPAN; installed in ~mca/cpan-pfx/
+use File::Find;
+use Digest::MD5;
+
+our $DIR_SEP = "/"; # this script is Un*x-centric
+our $ARCHDIR_RE =
+ qr{^(i686|x86_64|ppc)-(win\w+|linux|mac\w+)-};
+# i686-linux-thread-multi
+# x86_64-linux-thread-multi
+
+
+sub new { # minimal dumb constructor
+    return bless
+      {
+       # files we've seen which specifically represent modules
+       modules => {}, # key = expected package name, value = full path
+
+       # files we've seen which are not modules (e.g. .ini files)
+       files => {}, # key = filename under @INC, value = full path
+
+       # directories visited
+       dirs => {}, # key = path seen, value = [ de-symlinked path, seen_under_directory ]
+
+       # tracking of current top-level directory being scanned; is
+       # made "local" during the scan
+       _basedir => "???",
+      }, __PACKAGE__;
+}
+
+sub scan_inc {
+    my ($self, @inc) = @_;
+    # Scan from the right to see low-priority items first, then notice
+    # they are displaced by the higher priority items.
+    my $len = @inc;
+    for (my $i=$#inc; $i >= 0; $i--) {
+	my $inc = $inc[$i];
+	if ($inc eq '.') {
+	    # Scanning $PWD is likely to take a looong time and throw
+	    # up a load of junk.  It's on @INC by default when running
+	    # without -T
+	    warn "$self: Ignoring $inc\n";
+	    next;
+	}
+	$self->verbose("Item #$i of $len\t$inc\n");
+	$self->inc_item($inc);
+    }
+    return ();
+}
+
+sub verbose {
+    my ($self, $msg) = @_;
+    warn "dbg: $msg";;
+}
+
+sub inc_item {
+    my ($self, $inc) = @_;
+
+    if (ref($inc)) {
+	# CODE or object will return a filehandle
+	warn "Skipping funky '$inc'; results may not be reliable\n";
+	# Once we know about "all" the modules, we could ask this
+	# object to find each one and compare results.  More
+	# likely this object is doing some strange filtering of
+	# source and we won't see it in production.
+    } else {
+	local $$self{_basedir} = $inc;
+	$self->_inc_dir($inc);
+    }
+}
+
+sub in_dir {
+    my ($self) = @_;
+    return $$self{_basedir};
+}
+
+sub _inc_dir {
+    my ($self, $dir) = @_;
+    $dir =~ s{$DIR_SEP+$}{};
+
+    my $wanted = sub {
+	my $de_symlinked = $File::Find::fullname;
+	my $path = $_;
+	return if !defined $de_symlinked; # ignore dangling symlink; warnings already issued
+
+	my $dirfound = substr($path, 0, length($dir));
+	my $fn = $dirfound eq $path ? "" : substr($path, length($dir)+1);
+	die "$path: Confused because it was not found under $dir" unless $dirfound eq $dir;
+
+	# lstat($_) has been run for us,
+	# stat($_) performed below
+	if (-d _ || -l _ && -d) {
+	    # directories & symlinks to directories
+	    if ($fn =~ /^\d+/) {
+		warn "Skipping version-directory $fn at $path under $dir\n";
+		$File::Find::prune = 1;
+	    } elsif ($fn =~ $ARCHDIR_RE) {
+		warn "Skipping arch-directory $fn at $path under $dir\n";
+		$File::Find::prune = 1;
+	    } else {
+		my $seen = $self->_seen_dir($path, $de_symlinked);
+		$File::Find::prune = 1 if $seen;
+	    }
+	} elsif (! -f _) {
+	    warn "$path: ignoring non-file\n"; # pipes, sockets, doors & devices: pah-tooey
+	} else {
+	    if ($fn =~ /\.pmc?$/) {
+		$self->_seen_mod($fn, $path);
+	    } else {
+		$self->_seen_file($fn, $path);
+	    }
+	}
+    };
+    my $find = find({ wanted => $wanted, no_chdir => 1,
+		      follow => 1, dangling_symlinks => 1 }, $dir);
+}
+
+sub _seen_dir {
+    my ($self, $dir, $dir_nosym) = @_;
+
+    my $under = $self->in_dir;
+    my $what = $dir;
+    $what .= " -> $dir_nosym" if $dir ne $dir_nosym;
+
+    my $old = $$self{dirs}{$dir};
+    $$self{dirs}{$dir} = [ $dir_nosym, $under ];
+
+    if ($old) {
+	my @seen = ("Avoiding re-visit of $what found under $under");
+	push @seen, "already seen under $$old[1]" if $$old[1] ne $under;
+	push @seen, "via $$old[0]" if $$old[0] ne $dir;
+
+	$self->verbose(join ", ", @seen);
+    }
+
+    return $old; # may be undef
+}
+
+sub _seen_file {
+    my ($self, $fn, $path) = @_;
+    my $dir = $self->in_dir;
+
+    if (my $old = $$self{files}{$fn}) {
+	my %old = (path => $old);
+	my %new = (path => $path, under => $self->in_dir);
+	$self->shadowed(file => $fn, \%old, \%new);
+    }
+    $$self{files}{$fn} = $path;
+}
+
+sub _seen_mod {
+    my ($self, $fn, $path) = @_;
+    my $mod = $fn;
+    $mod =~ s/\.pmc?$//;
+    $mod =~ s{/}{::}g;
+
+    if (my $old = $$self{modules}{$mod}) {
+	my %old = (path => $old);
+	my %new = (path => $path, under => $self->in_dir);
+	$self->shadowed(module => $mod, \%old, \%new);
+    }
+    $$self{modules}{$mod} = $path;
+}
+
+
+sub shadowed {
+    my ($self, $type, $name, $old, $new) = @_;
+    foreach my $info ($old, $new) {
+	if ($type eq 'module') {
+	    __modinfo($info);
+	} elsif ($type eq 'file') {
+	    __fileinfo($info);
+	}
+    }
+    print "$type $name shadowed\n";
+    __dumpinfo($old);
+    __dumpinfo($new);
+}
+
+sub __modinfo {
+    my $info = shift;
+    __fileinfo($info);
+    my $mod = Module::Info->new_from_file($$info{path});
+    $mod->safe(1);
+    if ($mod) {
+	$$info{vsn} = $mod->version || "??";
+    }
+}
+
+sub __fileinfo {
+    my $info = shift;
+    if (open my $fh, "<", $$info{path}) {
+	my $D = Digest::MD5->new;
+	$D->addfile($fh);
+	$$info{md5} = $D->hexdigest;
+    } else {
+	$$info{readerr} = $!;
+    }
+}
+
+sub __dumpinfo {
+    my $info = shift;
+    print "\t".(join "; ", map {"$_:$$info{$_}"} sort keys %$info)."\n";
+}
+
+
+1;
+
+package main;
+
+use strict;
+use warnings;
+
+sub main {
+    my $obj = IncScan->new;
+    $obj->scan_inc(@INC);
+}
+
+main();
+
+
+=head1 NAME
+
+perl5lib-shadowed - detect duplicate files on PERL5LIB
+
+=head1 SYNOPSIS
+
+ perl5lib-shadowed
+ # just run it; no arguments are used (yet)
+
+=head1 DESCRIPTION
+
+Quick script to spot modules & other files available under @INC in
+more than one place.
+
+=head1 SEE ALSO
+
+L<Module::Info>, L<Module::List>, L<Module::Util> and L<Module::Which>
+do relevant things that are not exactly what I need to "find modules
+or other files on @INC which are shadowed".
+
+L<CPAN::Reporter> obviously has something too.
+
+=cut
