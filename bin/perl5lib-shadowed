@@ -50,7 +50,11 @@ sub scan_inc {
 	    next;
 	}
 	$self->verbose("Item #$i of $len\t$inc\n");
-	$self->inc_item($inc);
+	eval { $self->inc_item($inc) };
+	if (my $err = $@) {
+	    # File::Find will abort if it sees a loop
+	    warn "Error reading $inc: $err\n  continuing with next item";
+	}
     }
     return ();
 }
@@ -149,7 +153,7 @@ sub _seen_file {
 
     if (my $old = $$self{files}{$fn}) {
 	my %old = (path => $old);
-	my %new = (path => $path, under => $self->in_dir);
+	my %new = (path => $path);
 	$self->shadowed(file => $fn, \%old, \%new);
     }
     $$self{files}{$fn} = $path;
@@ -163,7 +167,7 @@ sub _seen_mod {
 
     if (my $old = $$self{modules}{$mod}) {
 	my %old = (path => $old);
-	my %new = (path => $path, under => $self->in_dir);
+	my %new = (path => $path);
 	$self->shadowed(module => $mod, \%old, \%new);
     }
     $$self{modules}{$mod} = $path;
@@ -219,6 +223,8 @@ use strict;
 use warnings;
 
 sub main {
+    warn "I'm not sure I have the correct set of search directories, nor the\n".
+      "mappings for autosplit & dynaload files...\n";
     my $obj = IncScan->new;
     $obj->scan_inc(@INC);
 }
