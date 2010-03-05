@@ -1,0 +1,30 @@
+#! /bin/sh
+
+# abort on error
+set -e
+
+USAGE="[+-]G"
+. "$(git --exec-path)/git-sh-setup"
+
+# we should honour the git-config setting, but meh
+# also should allow g+s
+if [ "$*" == "+G" ]; then
+    PERM=g+w
+elif [ "$*" == "-G" ]; then
+    PERM=g-w
+else
+    usage
+fi
+
+DIR_RW="u=rwx,go=rx,$PERM"
+FILE_RW="u=rw,go=r,$PERM"
+FILE_RO="0444"
+
+# this set of permissions may be somewhat simplistic...
+find $GIT_DIR -type d -print0 | xargs -r0 chmod -c $DIR_RW
+find $GIT_DIR -path $GIT_OBJECT_DIRECTORY -prune -o -type f -print0 | xargs -r0 chmod -c $FILE_RW
+find $GIT_OBJECT_DIRECTORY -path $GIT_OBJECT_DIRECTORY/info/packs -o -type f -print0 | xargs -r0 chmod -c $FILE_RO
+
+if [ -f "$GIT_OBJECT_DIRECTORY/info/packs" ]; then
+    chmod -c u=rw,go=r,$PERM "$GIT_OBJECT_DIRECTORY/info/packs"
+fi
