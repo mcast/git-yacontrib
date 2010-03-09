@@ -1,0 +1,3 @@
+#! /bin/sh
+
+ls -lart /tmp/ | grep $USER
