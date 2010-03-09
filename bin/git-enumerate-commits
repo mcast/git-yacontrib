@@ -25,6 +25,7 @@ fi
 
 
 for DIR in $DIRS; do
-    ( cd $DIR && git log --topo-order --pretty=tformat:%H%x09%ai --all ) | \
+    ( cd $DIR && git log --topo-order --pretty=tformat:%H%x09%ai --all \
+	|| echo -e "[w] $0: problem with $DIR\n---------------" >&2 ) | \
 	perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
 done
