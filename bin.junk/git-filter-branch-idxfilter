@@ -1,0 +1,43 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+=head1 DESCRIPTION
+
+A script to use with "git filter-branch --index-filter" for extracting
+a sub-project.
+
+=cut
+
+my @ln = `git ls-files -s`;
+
+my $igd;
+my $cmd = "git update-index --index-info";
+my $pid = open my $mkidx, "|-";
+die "Can't fork: $!" if !defined $pid;
+if (!$pid) {
+    # kid
+    $ENV{GIT_INDEX_FILE} .= ".new";
+    exec $cmd;
+    die "$cmd: exec failed: $!";
+} # else parent
+
+select $mkidx;
+
+# Exclude unwanted files.  Old versions of wanted files may have
+# various names around the place.
+foreach (@ln) {
+    next if m{\t(FOO|bob\.foo[^/]*)(/|$)};
+    print;
+    $igd=1 if /\t\.gitignore$/;
+}
+
+# Placeholder (empty) file to ensure something is the new index exists.
+# Ensure an empty file has been "git add"ed at some point!
+print "100644 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 0\t.gitignore\n" unless $igd;
+
+close $mkidx;
+die "$cmd failed: exit code $?" if $?;
+rename "$ENV{GIT_INDEX_FILE}.new", $ENV{GIT_INDEX_FILE}
+  or die "Rename $ENV{GIT_INDEX_FILE}\{.new,} failed: $!";
