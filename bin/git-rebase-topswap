@@ -19,7 +19,7 @@ git-rebase-topswap - reverse most recent pair of revisions
 
 =head1 DESCRIPTION
 
-Defines itself as EDITOR and calls C<git-rebase -i HEAD^^>.
+Defines itself as EDITOR and calls C<git rebase -i HEAD^^>.
 
 This is useful if you were planning to amend the last commit, but have
 just buried it with another commit.
@@ -59,17 +59,17 @@ if (@ARGV && "--editor" eq $ARGV[0]) {
     shift @ARGV;
     editor();
 
-    # If we fail, it would be polite to "git-rebase --abort"
+    # If we fail, it would be polite to "git rebase --abort"
 
 } elsif (@ARGV) { # || grep /^(-h|--help)$/, @ARGV) {
     # --help
-    die "Syntax: $0 <args>*\n\nCalls 'git-rebase -i <args>*'\n";
+    die "Syntax: $0 <args>*\n\nCalls 'git rebase -i <args>*'\n";
 
 } else {
-    # git-rebase does the work
+    # "git rebase" does the work
     $ENV{EDITOR} = "$0 --editor";
-    exec("git-rebase", -i => "HEAD^^");
-    die "Whoops, git-rebase failed: $!";
+    exec(git => "rebase", -i => "HEAD^^");
+    die "Whoops, git rebase failed: $!";
 }
 
 
