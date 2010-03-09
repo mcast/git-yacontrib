@@ -16,3 +16,8 @@ later, per local policy.
 The short, messy, one-off solutions and wrapper scripts I would expect
 to be considered "trivial", more an example of how something could be
 done.
+
+(I realise this is far to vague to form a reliable declaration of
+"release under GPLv2" except where explicit but marking for release
+takes time, and it's probably better to make the thing visible and
+wait for someone to ask for clarification.)
