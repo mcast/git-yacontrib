@@ -25,7 +25,17 @@ fi
 
 
 for DIR in $DIRS; do
-    ( cd $DIR && git log --topo-order --pretty=tformat:%H%x09%ai --all \
-	|| echo -e "[w] $0: problem with $DIR\n---------------" >&2 ) | \
-	perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
+    if cd $DIR; then
+	INFO=`git for-each-ref --count 1 2>&1`
+	OK=$?
+	if [[ $OK != 0 ]]; then
+	    echo "$0: skipping $DIR because ''$INFO''" >&2
+	elif [ -z "$INFO" ]; then
+	    echo -e "$DIR\t(no refs)"
+	else
+	    (git log --topo-order --pretty=tformat:%H%x09%ai --all \
+		|| echo -e "[w] $0: problem with $DIR\n---------------" >&2 ) | \
+		perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
+	fi
+    fi
 done
