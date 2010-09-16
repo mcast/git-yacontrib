@@ -33,7 +33,7 @@ for DIR in $DIRS; do
 	elif [ -z "$INFO" ]; then
 	    echo -e "$DIR\t(no refs)"
 	else
-	    (git log --topo-order --pretty=tformat:%H%x09%ai --all \
+	    (git log --date-order --pretty=tformat:%H%x09%ai --all \
 		|| echo -e "[w] $0: problem with $DIR\n---------------" >&2 ) | \
 		perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
 	fi
