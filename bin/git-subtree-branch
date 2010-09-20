@@ -1,0 +1,110 @@
+#! /bin/sh
+
+# Make a branch containing a subtree.
+#
+# Borrows some ideas from git-filter-branch in core-git.
+
+
+warn () {
+        echo "$*" >&2
+}
+
+die () {
+    warn "$*"
+    exit 1
+}
+
+dbg () {
+        echo "dbg: $*" >&2
+}
+
+noise () {
+    if [ -n "$VERBOSE" ]; then
+	echo "$*"
+    fi
+}
+
+
+# Turn STDIN
+#   foo=bar
+# format into a safe STDOUT
+#   foo=$'bar'
+#
+# nb. this cannot protect us against unexpected \n
+shquotify () {
+    perl -pe 'sub shquote { my $t = shift; $t =~ s{([\x00-\x1f\x27\x5c])}{sprintf("\\x%02x", ord($1))}eg; return "=\$\x27$t\x27" }  s/=(.*)/shquote($1)/e'
+}
+
+# part_branch <prefix> <from_branch>
+part_branch () {
+    echo "refs/remotes/subtree/$2,$( echo $1 | tr / , )"
+}
+
+
+# #TMPDIR=".git-subtree-branch"
+# 
+# all_refs () {
+#     git for-each-ref --format='%(objectname) %(objecttype) %(refname)' |
+#     while read sha1 type ref; do
+# 	case "$type,$ref" in
+# 	    'commit,refs/'*'subtr,'* | 'commit,refs/original/'* | 'commit,refs/remotes/'* )
+# 		dbg "Ignoring existing $ref"
+# 		;;
+# 	    'commit,refs/'*)
+# 		dbg "Going to rewrite $ref"
+# 		rewrite_refs $ref
+# 		;;
+# 	    *)
+# 		warn "Confused by $type $ref ($sha1), ignoring"
+# 		;;
+# 	esac
+#     done
+# }
+#
+#####  Plan A was to create an entire branch, with 1:1 commits of partial subtrees,
+#      but this doesn't promise to be useful or pretty.
+
+
+subtree_branch () {
+    # Prefix we want, without trailing /
+    prefix=$( echo $1 | sed -e 's/\/$//' )
+
+    from_branch=$2
+
+    partref=$( part_branch $prefix $from_branch )
+
+    appname=$( basename $0 )
+
+    # Jump through hoops to get commit properties in variables
+    eval $( git log -n1 --format="commitid=%H%nGIT_AUTHOR_NAME=%an%nGIT_AUTHOR_EMAIL=%ae%nGIT_AUTHOR_DATE=%ai" "$from_branch" | shquotify )
+
+    # Find our tree
+    git ls-tree --full-tree -d $commitid $prefix | (
+	read perms type sha1 fn
+	export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE
+
+	if [[ -z "$sha1" ]]; then
+	    die "Directory $prefix/ not found in $commitid ($from_branch)"
+	fi
+
+	# Make the commit
+	new_commit_id=$(
+	    (echo "$0: just $prefix/ from $from_branch";
+		git log -n1 --format="%n%n%s" "$from_branch") | \
+		    git commit-tree $sha1 -p $commitid )
+
+	# Create new ref to commit
+	git update-ref -m "$0: rewrite_refs $from_branch $prefix" $partref $new_commit_id
+	noise Made new commit $( git show-ref -s6 $partref )
+	)
+}
+
+VERBOSE=1
+if [[ $# == 2 ]]; then
+    subtree_branch $1 $2
+else
+    die "Syntax: $0 <dir_prefix> <branch>
+
+Creates from the contents of sub/dir/ on branch_foo a new remote
+branch of the form $( part_branch sub/dir branch_foo )"
+fi
