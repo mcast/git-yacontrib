@@ -18,6 +18,7 @@ DBLIST=$*
 : ${dbpass:=""}
 
 : ${OUTDIR:=.}
+: ${BZIP:=pbzip2}
 
 
 set -e
@@ -25,11 +26,12 @@ echo "Will archive for each FOO in ($DBLIST) to $OUTDIR/FOO.*"
 
 # set -x
 for dbinst in $DBLIST; do
-    echo "Archive $dbinst into $dbinst.{sql,sql.md5,tmd5}"
+    echo "Archive $dbinst into $dbinst.{sql.bz2,log,sql.md5,tmd5}"
 
     echo "  dumping..."
     mysqldump -h$dbhost -P$dbport -u$dbuser -p$dbpass \
 	--opt --allow-keywords -i --flush-privileges --lock-tables --routines \
+	--log-error $dbinst.log \
 	--databases $dbinst | tee $OUTDIR/$dbinst.sql | md5sum | perl -pe 'BEGIN { $fn=shift } s/  -$/  $fn/' $dbinst.sql > $OUTDIR/$dbinst.sql.md5
 
     echo "  mk-table-checksum..."
@@ -38,7 +40,7 @@ for dbinst in $DBLIST; do
     # it's not installed on cbi4, perhaps should be
 
     echo "  compress..."
-    bzip2 -v9 $OUTDIR/$dbinst.sql
+    $BZIP -v9 $OUTDIR/$dbinst.sql
 
     chmod a-w $OUTDIR/$dbinst.{sql.bz2,sql.md5,tmd5}
 done
