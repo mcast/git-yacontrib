@@ -95,7 +95,7 @@ subtree_branch () {
 
 	# Create new ref to commit
 	git update-ref -m "$0: rewrite_refs $from_branch $prefix" $partref $new_commit_id
-	noise Made new commit $( git show-ref -s6 $partref )
+	noise Made new commit $( git show-ref -s6 $partref ) on $partref
 	)
 }
 
