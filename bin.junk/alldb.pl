@@ -47,6 +47,7 @@ sub run_parallel {
 	}
     };
 
+    $| = 1;
     foreach my $info (@all_tables) {
 	$pid = fork();
 	$dbinst = $$info[0];
@@ -59,6 +60,7 @@ sub run_parallel {
 	    push @kid, $pid;
 	} else {
 	    # child
+	    $| = 1;
 	    run_for_tables($code, $user, $pass, @$info);
 	    last;
 	}
