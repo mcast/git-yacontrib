@@ -8,8 +8,9 @@ use DBI;
 
 sub main {
     my ($user, $pass) = qw( ottro );
-    my @dbinst = qw( otterlive:3301 otterpipe1:3302 otterpipe2:3303 );
-
+    my @dbinst;
+#    push @dbinst, qw( vegabuild:3304 vegabuild:5304 );
+    push @dbinst, qw( otterlive:3301 otterpipe1:3302 otterpipe2:3303 );
     my $code = \&show_table_type;
 
     my @all_tables = enumerate_all($user, $pass, @dbinst);
@@ -100,10 +101,13 @@ sub enumerate_all {
 
 	my @db_tables; # list of [ $database_name, $table_name ] pairs
 	foreach my $db (@{ $dbh->selectcol_arrayref("show databases") }) {
-	    my $qdb = $dbh->quote_identifier($db);
-	    push @db_tables,
-	      map {[ $db, $_ ]}
-		@{ $dbh->selectcol_arrayref("show tables from $qdb") };
+	    eval {
+		my $qdb = $dbh->quote_identifier($db);
+		push @db_tables,
+		  map {[ $db, $_ ]}
+		    @{ $dbh->selectcol_arrayref("show tables from $qdb") };
+	    };
+	    warn "Skipping tables in $dbinst > $db: $@" if $@;
 	}
 
 	push @all_tables, [ $dbinst, $dsn, \@db_tables ];
@@ -145,11 +149,14 @@ sub run_for_tables {
     # XXX: passing too much stuff in here
     my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 });
 
-    foreach my $dbtbl (@$db_tables) {
-	my ($db, $table) = @$dbtbl;
-	$dbh->do("use ".$dbh->quote_identifier($db));
-	$code->($dbh, "$dbinst > $db.$table", $table);
-    }
+    eval {
+	foreach my $dbtbl (@$db_tables) {
+	    my ($db, $table) = @$dbtbl;
+	    $dbh->do("use ".$dbh->quote_identifier($db));
+	    $code->($dbh, "$dbinst > $db.$table", $table);
+	}
+    };
+    warn "Run for $dbinst abended: $@" if $@;
 }
 
 
@@ -166,4 +173,11 @@ sub show_table_type {
 #	my ($rows) = $dbh->selectrow_array("select count(*) from `$tbl`");
 #	print "  $db_what:\t$type\t$rows\n";
 #    }
+}
+
+sub show_table_size {
+    my ($dbh, $db_what, $tbl) = @_;
+
+    my @info = $dbh->selectrow_array("show table status like ?", {}, $tbl);
+    printf("  %s:\t%.3f MiB\n", $db_what, $info[6] / 1024 / 1024);
 }
