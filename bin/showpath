@@ -3,6 +3,7 @@
 use strict;
 use warnings ;
 
+use Cwd 'abs_path';
 use constant DEFAULT_PATHS => qw( PATH PERL5LIB LD_LIBRARY_PATH );
 
 =head1 NAME
@@ -73,9 +74,19 @@ sub showpath {
 	    push @flag, 'dir' if -d $part;
 	    push @flag, 'ABSENT' if !-e _;
 	    push @flag, 'DUP' if $seen{$part} ++;
-	    push @flag, 'REL' if $part !~ m{^/};
+	    push @flag, 'REL' if $part !~ m{^/}; # XXX: UN*Xism
 
-	    printf("  %-60s %s\n", $part, join ",", @flag);
+	    my $symlink = '';
+	    if (-l $part) {
+		push @flag, 'symlink';
+		my $ln = readlink($part);
+		$symlink = " -> $ln";
+		my $real = abs_path($part);
+		$symlink .= " -> $real" unless $real eq $ln;
+		push @flag, "ln2DUP" if $seen{$real};
+	    }
+
+	    printf("  %-60s %s%s\n", $part, (join ",", @flag), $symlink);
 	}
 	print "\n";
     }
