@@ -70,6 +70,8 @@ sub showpath {
 	# display
 	print "$key:\n";
 	foreach my $part (split /:/, $val) {
+	    $part =~ s{/+$}{};
+
 	    my @flag;
 	    push @flag, 'dir' if -d $part;
 	    push @flag, 'ABSENT' if !-e _;
