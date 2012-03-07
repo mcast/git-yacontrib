@@ -1,0 +1,36 @@
+#! /bin/bash
+
+# Git proxy wrapper
+#
+# Based on suggestions on the web,
+#
+#    http://linux.derkeiler.com/Mailing-Lists/Kernel/2006-02/msg09346.html
+#    http://limlian.blogspot.com/2008/08/use-http-proxy-for-git-client.html 
+#
+# Put it on your PATH. You can either use
+#
+#   env GIT_PROXY_COMMAND=git-proxy-squid git clone git://host/path
+#
+# or
+#
+#  git config --global core.gitproxy git-proxy-squid
+#  git clone git://host/path
+#
+#
+# Called by git with <hostname> <port>
+
+if [ -z "$http_proxy" ]; then
+    echo "$0: required http_proxy is not set" >&2
+    exit 7
+elif [[ "$http_proxy" =~ ^http://([^:/]+)(:([0-9]+))?/?$ ]]; then
+    # limited parsing of proxy - http with no auth
+    phost=${BASH_REMATCH[1]}
+    pport=${BASH_REMATCH[3]}
+    exec soocat - "PROXY:$phost:$1:$2,proxyport=$pport"
+    # ,proxyauth=user:pass
+    echo "$0: failed to exec socat" >&2
+    exit 8
+else
+    echo "$0: cannot parse http_proxy='$http_proxy'" >&2
+    exit 9
+fi
