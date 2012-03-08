@@ -1,0 +1,12 @@
+#! /bin/sh
+
+# Shortcut to open both Tk tools
+
+if [ -n "$1" ]; then
+    cd "$1"
+    echo -n "In "; pwd
+    shift
+fi
+
+git k
+git g
