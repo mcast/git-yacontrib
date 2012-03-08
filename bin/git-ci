@@ -1,0 +1,7 @@
+#! /bin/sh
+
+# Equivalent to
+#
+#   git config --global alias.ci commit
+
+exec git ci "$@"

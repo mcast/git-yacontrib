@@ -1,0 +1,7 @@
+#! /bin/sh
+
+# Equivalent to
+#
+#   git config --global alias.co checkout
+
+exec git checkout "$@"
