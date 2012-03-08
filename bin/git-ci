@@ -4,4 +4,4 @@
 #
 #   git config --global alias.ci commit
 
-exec git ci "$@"
+exec git commit "$@"
