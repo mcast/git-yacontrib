@@ -1,0 +1,19 @@
+#! /bin/bash
+
+USAGE="" # no options
+LONG_USAGE="This tool rewinds commits from Dist::Zilla::Plugin::Git::CommitBuild
+made during the Dist::Zilla build process.
+
+Currently it does NOT consult dist.ini but instead operates on the
+branch 'built/master'."
+
+. "$(git --exec-path)/git-sh-setup"
+
+
+# Old:
+#   git checkout built/master && git reset --hard HEAD^ && git checkout master
+
+BRANCH=built/master
+git update-ref -m 'rewind: undzil' refs/heads/built/master \
+    $( git rev-parse $BRANCH~1 )
+
