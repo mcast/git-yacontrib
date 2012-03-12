@@ -9,11 +9,26 @@ branch 'built/master'."
 
 . "$(git --exec-path)/git-sh-setup"
 
-
-# Old:
-#   git checkout built/master && git reset --hard HEAD^ && git checkout master
+dent() {
+    sed -e 's/^/  /'
+}
 
 BRANCH=built/master
-git update-ref -m 'rewind: undzil' refs/heads/built/master \
-    $( git rev-parse $BRANCH~1 )
+N=1
+NPLUR=''
+VERBOSE=1
 
+
+[ -n "$( git show-ref refs/heads/"$BRANCH" )" ] || \
+    die "Branch $BRANCH does not exist in $GIT_DIR"
+
+if [ -n "$VERBOSE" ]; then
+    printf "Going to rewind %s by %s commit%s\n\nFrom\n" "$BRANCH" "$N" "$NPLUR"
+
+    git log -1 "$BRANCH" | dent
+    printf "\n\nTo\n"
+    git log -1 "$BRANCH~$N" | dent
+fi
+
+git update-ref -m "rewind: undzil ($N)" "refs/heads/$BRANCH" \
+    $( git rev-parse "$BRANCH~$N" )
