@@ -1,0 +1,18 @@
+#! /bin/sh
+
+USAGE="[...more options for git-commit]"
+LONG_USAGE='"Quiet commit" for auto-commit scripts, calls "git commit -q ..." iff
+there are staged diffs to commit.
+
+Otherwise it tries to avoid generating noise or non-zero return code
+for a clean working copy or any unstaged changes.
+'
+
+. "$(git --exec-path)/git-sh-setup"
+
+if git diff --cached --quiet --exit-code; then
+    :
+    # nothing to do
+else
+    git commit -q "$@"
+fi
