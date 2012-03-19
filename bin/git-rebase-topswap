@@ -36,9 +36,9 @@ real fast?) because the Committer: header will be different.
  Copyright (c) 2009 Genome Research Ltd.
  Author: Matthew Astley <mca@sanger.ac.uk>
 
-This file is part of "mca-wtsi/scripts".
+This file is part of "git-yacontrib".
 
-"mca-wtsi/scripts" is free software; you can redistribute it and/or
+"git-yacontrib" is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as
 published by the Free Software Foundation; either version 2 of the
 License, or (at your option) any later version.
