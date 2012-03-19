@@ -1,5 +1,6 @@
 #! /bin/sh
 
+SUBDIRECTORY_OK=1
 USAGE="[...more options for git-commit]"
 LONG_USAGE='"Quiet commit" for auto-commit scripts, calls "git commit -q ..." iff
 there are staged diffs to commit.

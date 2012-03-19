@@ -1,5 +1,6 @@
 #! /bin/bash
 
+SUBDIRECTORY_OK=1
 USAGE="" # no options
 LONG_USAGE="This tool rewinds commits from Dist::Zilla::Plugin::Git::CommitBuild
 made during the Dist::Zilla build process.
