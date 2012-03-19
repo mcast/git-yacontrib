@@ -12,6 +12,8 @@ git-rebase-topswap - reverse most recent pair of revisions
 
 =head1 SYNOPSIS
 
+ # want to "git commit --amend=HEAD^" ?
+
  git-rebase-topswap
 
  git-rebase-topswap --editor <filename>
