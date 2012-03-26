@@ -1,0 +1,208 @@
+#! /bin/sh
+
+SUBDIRECTORY_OK=1
+OPTIONS_SPEC="\
+git ll-init [ -L <local-lib-dir> ] [ --perl5 ] [ --find ]
+
+This command sets up a directory where local library installations can
+be tracked with Git.  It is used by other git-ll commands, but could
+also be used directly or inspected to see what is about to happen.
+
+Ideally it could be extended to cover the equivalent tools for other
+languages, coexisting in a useful way instead of balkanised into many
+pattern-copying tools.
+
+
+First it sets the local-lib directory (see --help-more).
+
+If the directory exists but doesn't have the version mark, the
+operation aborts (error code 3).
+
+If the directory does not exist, it will be initialised.  If
+initialisation fails, the junk should be removed (XXX: not implemented)
+
+The --find option causes the directory path to be printed, for use by
+related tools.
+
+Otherwise nothing happens.  This default is not very useful and should
+change.  Maybe start a shell with a fully configured environment?
+--
+help     Show help.
+help-more Explain more about how it picks the target directory.
+L,lldir= Directory to operate upon.
+v,verbose! More noise
+find! After checking or initialising, print the local-lib pathname.
+perl5! Configure for Perl5 language"
+
+. "$(git --exec-path)/git-sh-setup"
+
+
+ll_version() {
+    # Generating from git-describe XXX: requires something like an installer
+    echo "0.01"
+}
+
+
+ll_exist() {
+    # vars passed in from ll_main
+    (
+	cd "$llrel" 2>/dev/null && \
+	    cd "$lldir" 2>/dev/null && \
+	    ( # Directory exists
+	    ll_check_version >&2 && \
+		pwd
+	    # If it is not OK, emit nothing to prevent ll_create
+	    true
+	)
+    )
+}
+
+ll_check_version() {
+    local vsn
+    if ! [ -d '.git' ]; then
+	printf "%s: Found %s, but it is not the top of a Git working tree\n" \
+	    "$prog" "$PWD" >&2
+	false
+    elif ! [ -w '.git/HEAD' ]; then
+	printf "%s: %s does not look writable\n" "$prog" "$PWD" >&2
+	false
+    elif vsn="$( git config --get git-ll.version )"; then
+	$verb_printf "Found %s (version=%s)\n" \
+	    "$PWD" "$vsn"
+	true
+    else
+	printf "Found %s but don't like git-ll.version='%s' (exit code %s)\n" \
+	    "$PWD" "$vsn" "$?"
+	false
+    fi
+}
+
+ll_create() {
+    # vars passed in from ll_main
+    (
+	cd "$llrel" && \
+	    ll_create_empty "$lldir" >&2 && \
+	    ll_setup_perl5 >&2 && \
+	    ll_create_done >&2 && \
+	    pwd
+    )
+}
+
+ll_create_empty() {
+    local vsn
+    vsn="$( ll_version )"
+    mkdir $verb_v "$1" && \
+	cd "$1" && \
+	git init $verb_q && \
+	git commit $verb_q --allow-empty -m "$( printf "Initial empty commit.\n\nMade by %s %s\nat %s\non %s (%s)\n" "$0" "$vsn" "$PWD" "$( hostname )" "$( uname -a )" )" && \
+	git config --add git-ll.version "$vsn"
+}
+
+ll_create_done() {
+    git add $verb_v -A . && \
+	git commit $verb_q -m "init complete"
+}
+
+ll_setup_perl5() {
+    # XXX: deal with absence of local::lib
+    perl "-Mlocal::lib=." > perl5.sh
+    # XXX: also need cpanm & some config
+}
+
+
+ll_help_more() {
+    printf "
+These are the rules used to set the local-lib directory, in precedence
+order:
+
+ 1) -L option, which may have been passed from another git-ll command.
+    relative to \$PWD when the command starts.
+
+ 2) The \$PERL_LOCAL_LIB_ROOT environment variable
+    Should be an absolute pathname.
+
+    (Or similar, for other languages - not implemented.  If we want
+    the PERL_LOCAL_LIB_ROOT but only have environment variables set
+    for Python and Ruby...  take consensus or warn & skip?)
+
+ x) \$( git ll-which ... ) if the command produces success.
+    Should be an absolute pathname.
+
+    This is intended as an override hook (YAGNI?) for using this tool
+    on non-Git project checkouts.  It should be safer than picking up
+    dotfiles from anywhere but \$HOME , since we trust \$PATH .
+
+ 4) The configuration value \$( git config --get local-lib )
+    Relative to the top of the current Git working directory.
+    Assumption: this config is from the user, not a project checkout.
+
+ x) Fallback value, possibly language-dependent?  It's not clear that
+    this is intuitive or compatible with multiple languages.
+
+ 6) Fail.  Return error code 2.
+
+x) are not implemented.
+\n"
+}
+
+
+ll_main() {
+    local sw lldir llrel lllang
+    unset CDPATH
+
+    prog="$( basename $0 | sed -e 's/^git-/git /' )"
+
+    # Read opts - normalised by "git rev-parse --parseopt"
+    verb_v=
+    verb_q=-q
+    verb_printf=true
+    while [ $# -gt 0 ]; do
+	sw="$1"
+	shift
+	case "$sw" in
+	    -L) llrel="$PWD"
+		lldir="$1"
+		shift ;;
+	    -v) verb_v=-v
+		verb_q=
+		verb_printf=printf
+		;;
+	    --help-more) ll_help_more
+		return 0 ;;
+	    --find) do_find=1 ;;
+	    --perl5) lllang="$lllang,perl5" ;;
+	    --) break ;;
+	esac
+    done
+
+    [ $# -eq 0 ] || die "Aborting: $prog takes option flags but no extra arguments" >&2
+
+    # Choose the lldir.  It may not exist yet.
+    if [ -n "$lldir" ]; then
+	# 1) -L option, done
+	:
+    elif [ -n "$PERL_LOCAL_LIB_ROOT" ] && [ ",$lllang," =~ ,perl5, ]; then
+	# 2) perl5
+	lldir="$PERL_LOCAL_LIB_ROOT"
+	llrel="/"
+    elif lldir="$( git config --get git-ll.dir )"; then
+	# 4) read config - global or a work tree
+	llrel="$( cd_to_toplevel && pwd )" || \
+	    die "Cannot find top of work tree from $PWD"
+    else
+	# 6) fail
+	echo "Aborting: I have no local-lib directory" >&2
+	exit 2
+    fi
+
+    $verb_printf "[d] Searching lldir=%s from llrel=%s\n" "$lldir" "$llrel" >&2
+    lldir="$( ll_exist || ll_create )"
+    [ -z "$lldir" ] && return 3
+    unset llrel
+
+    if [ -n "$do_find" ]; then
+	echo "$lldir"
+    fi
+}
+
+ll_main "$@"
