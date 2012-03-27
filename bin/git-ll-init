@@ -1,6 +1,6 @@
 #! /bin/sh
 
-SUBDIRECTORY_OK=1
+NONGIT_OK=1
 OPTIONS_SPEC="\
 git ll-init [ -L <local-lib-dir> ] [ --perl5 ] [ --find ]
 
@@ -100,6 +100,7 @@ ll_create_empty() {
 }
 
 ll_create_done() {
+    echo "# You might want something here..." > .gitignore
     git add $verb_v -A . && \
 	git commit $verb_q -m "init complete"
 }
