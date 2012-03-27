@@ -80,6 +80,7 @@ ll_check_version() {
 ll_create() {
     # vars passed in from ll_main
     (
+	clear_local_git_env
 	cd "$llrel" && \
 	    ll_create_empty "$lldir" >&2 && \
 	    ll_setup_perl5 >&2 && \
