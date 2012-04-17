@@ -1,3 +1,13 @@
 #! /bin/sh
 
-gitk --all HEAD &
+# Shortcut to gitk to "show everything" - mst useful on small projects
+
+MORE=
+
+if git show-ref -q --head -- HEAD; then
+    MORE="$MORE HEAD"
+else
+    echo git-k shortcut: not showing absent HEAD
+fi
+
+gitk --all $MORE &
