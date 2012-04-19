@@ -1,6 +1,24 @@
 #! /bin/sh
 
-# Shortcut to gitk to "show everything" - mst useful on small projects
+if [ "$1" = '-h' ] || [ "$1" = "--help" ]; then
+    cat <<EOF
+Syntax: git k
+
+Shortcut to gitk,
+  "show all heads" - most useful on small projects
+  put it in the background
+
+See also:
+  git g
+  git gk
+EOF
+    exit 0
+fi >&2
+
+if [ $# != 0 ]; then
+    echo 'git k: takes no arguments (yet)' >&2
+    exit 1
+fi
 
 MORE=
 

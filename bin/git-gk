@@ -1,9 +1,24 @@
 #! /bin/sh
 
 # Shortcut to open both Tk tools
+if [ "$1" = '-h' ] || [ "$1" = "--help" ]; then
+    cat <<EOF
+Syntax: git gk [ <workdir> ]
+
+Shortcut to run gitk (via git-k) and git-gui (via git-g),
+putting both in the background.
+
+If a workdir is given, attempt to cd there first.
+
+See also:
+  git g
+  git k
+EOF
+    exit 0
+fi >&2
 
 if [ -n "$1" ]; then
-    cd "$1"
+    cd "$1" || exit 2
     echo -n "In "; pwd
     shift
 fi

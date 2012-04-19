@@ -1,3 +1,21 @@
 #! /bin/sh
 
+if [ "$1" = '-h' ] || [ "$1" = "--help" ]; then
+    cat <<EOF
+Syntax: git g
+
+Shortcut to "git gui &"
+
+See also:
+  git k
+  git gk
+EOF
+    exit 0
+fi >&2
+
+if [ $# != 0 ]; then
+    echo 'git g: takes no arguments (yet)' >&2
+    exit 1
+fi
+
 git gui &
