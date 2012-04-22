@@ -1,0 +1,7 @@
+#! /bin/sh
+
+# Equivalent to
+#
+#   git config --global alias.ff 'merge --ff-only'
+
+exec git merge --ff-only "$@"
