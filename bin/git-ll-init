@@ -134,7 +134,7 @@ order:
     on non-Git project checkouts.  It should be safer than picking up
     dotfiles from anywhere but \$HOME , since we trust \$PATH .
 
- 4) The configuration value \$( git config --get local-lib )
+ 4) The configuration value \$( git config --get git-ll.dir )
     Relative to the top of the current Git working directory.
     Assumption: this config is from the user, not a project checkout.
 
