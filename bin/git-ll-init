@@ -127,6 +127,9 @@ order:
     the PERL_LOCAL_LIB_ROOT but only have environment variables set
     for Python and Ruby...  take consensus or warn & skip?)
 
+ x) Current directory, if it looks like we made it.
+    This would make it easy to just cd there and operate.
+
  x) \$( git ll-which ... ) if the command produces success.
     Should be an absolute pathname.
 
