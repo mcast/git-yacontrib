@@ -54,10 +54,8 @@ ll_main() {
     lldir="$( git ll-init ${lldir:+-L "$lldir"} $verb_v --find --perl5 )" \
 	|| die "$prog: aborting, no local-lib-dir"
 
-    set -x
     cd "$lldir" || die "$prog: failed cd $lldir"
-    . ./perl5.sh || die "$prog: failed to source perl5.sh"
-    set +x
+    setup_maybe
 
     while [ $# -gt 0 ]; do
 	sw=$1
@@ -108,5 +106,16 @@ ll_install() {
 
     return $instret
 }
+
+setup_maybe() {
+    verb_printf "==> In %s\n" "$PWD"
+    [ -n "$verb_v" ] && set -x
+    # Sourcing should be conditional: if PERL_LOCAL_LIB_ROOT is
+    # already set to what's in the file, do nothing (because it isn't
+    # idempotent)
+    . ./perl5.sh || die "$prog: failed to source perl5.sh"
+    set +x
+}
+
 
 ll_main "$@"
