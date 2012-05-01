@@ -27,6 +27,11 @@ This is useful if you were planning to amend the last commit, but have
 just buried it with another commit.
 
 
+=head1 SEE ALSO
+
+The C<--autosquash> flag for L<git-rebase(1)>.
+
+
 =head1 CAVEATS
 
 Note that a pair of swaps is not a null operation (unless you do it
