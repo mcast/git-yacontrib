@@ -1,7 +1,18 @@
 #! /bin/sh
 
-# Echo to stdout the current branch name, or if we have detached HEAD
-# the commitid
+SUBDIRECTORY_OK=1
+OPTIONS_SPEC="\
+git head
+
+Echo to stdout the current branch name,
+or if we have detached HEAD the commitid.
+
+Fails if run without a Git repository.
+--
+"
+
+. "$(git --exec-path)/git-sh-setup"
+
 
 git_current_commit() {
     {
@@ -11,5 +22,9 @@ git_current_commit() {
     } |
     sed -e 's|^refs/heads/||'
 }
+
+
+[ "$1" = "--" ] && shift
+[ $# -eq 0 ] || die "Aborting: $0 takes option flags but no extra arguments ($@)" >&2
 
 git_current_commit
