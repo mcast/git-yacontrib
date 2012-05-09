@@ -1,15 +1,16 @@
 #! /bin/sh
 
 do_inst() {
-    local dest leaf
+    local src dest leaf
     dest="$1"
+    src="$PWD"
     if ! [ -d "$dest" ] || ! [ -w "$dest" ]; then
 	echo "$0: $dest is not a writable directory" >&2
 	return 2
     fi
 
-    ln -snv "$PWD/bin" "$dest/,git-yacontrib"
-    for leaf in git-ci git-co git-ff git-g git-gk git-iec git-k git-ll-cpanm git-ll-init git-qcommit git-rebase-topswap git-st git-undzil git-up; do
+    ln -snv "$src/bin" "$dest/,git-yacontrib"
+    for leaf in $( cat "$src/install.txt" ); do
 	ln -snv ",git-yacontrib/$leaf" "$dest"
     done
 }
