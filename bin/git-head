@@ -1,0 +1,15 @@
+#! /bin/sh
+
+# Echo to stdout the current branch name, or if we have detached HEAD
+# the commitid
+
+git_current_commit() {
+    {
+        git symbolic-ref -q HEAD ||
+        git rev-parse HEAD ||
+        false
+    } |
+    sed -e 's|^refs/heads/||'
+}
+
+git_current_commit
