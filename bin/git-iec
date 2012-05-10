@@ -1,3 +1,21 @@
 #! /bin/sh
 
+SUBDIRECTORY_OK=1
+OPTIONS_SPEC="\
+git iec
+
+Create an empty initial commit, for a fresh repository.
+
+Fails if run without a Git repository,
+or if there are already commits on the current branch.
+
+--
+"
+
+. "$(git --exec-path)/git-sh-setup"
+
+if git rev-parse HEAD >/dev/null 2>&1; then
+    die "$0: There seem to be commits already"
+fi
+
 exec git commit --allow-empty -m 'initial empty commit'
