@@ -1,0 +1,31 @@
+#! /bin/sh
+
+main() {
+  if  [ -z "$SSH_AUTH_SOCK" ] || [ -z "$SSH_AGENT_PID" ]; then
+      eval "$( vars_majvote )"
+  fi
+  case "$1" in
+      "" | -h | --help)
+	  echo "Syntax: $0 <command> [ <args> ... ]
+
+Run command with an ssh agent.
+
+Obtain the SSH_AGENT_PID and SSH_AUTH_SOCK for the current user, by
+majority vote from the environment of (legible) processes.  (Or keep
+existing setting.)
+"
+	  exit 2
+	  ;;
+  esac
+
+  exec "$@"
+}
+
+vars_majvote() {
+  for pid in $( ps x | sed -re 's/^ *([0-9]+) .*/\1/' ); do
+      (grep -zE '^SSH_A(UTH_SOCK|GENT_PID)=' /proc/$pid/environ 2>/dev/null && echo) | sort -z | tr '\0' ' '
+  done | sort | uniq -c | sort -rn | head -n1 | sed -re 's/^ *[0-9]+ +/export /'
+}
+
+
+main "$@"

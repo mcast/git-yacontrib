@@ -1,3 +1,4 @@
+_ssh-findagent
 git-P
 git-br
 git-ci
