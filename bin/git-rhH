@@ -1,0 +1,10 @@
+#! /bin/sh
+
+# Almost equivalent to
+#
+#   git config --global alias.rhH 'reset --hard HEAD'
+#
+# This command is in the "convenient but dangerous" category.
+
+echo "rhH: git reset --hard HEAD$1"
+exec git reset --hard "HEAD$1"
