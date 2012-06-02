@@ -140,6 +140,23 @@ textfile repo.)
 Configurable for rebase vs. merge, to allow for more than a pair of
 repos.
 
+=head2 git-wstash
+
+"with a git stash, do"
+
+ #! /bin/sh
+ 
+ set -e
+ set -x
+ 
+ git stash save "with stash: $@"
+ "$@"
+ git stash pop
+ 
+ # This would seem to need some extra safeguards,
+ #
+ #   if nothing to stash, just do command; else we pop an older stash!
+
 
 =head1 AUTHOR
 
