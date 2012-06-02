@@ -50,6 +50,85 @@ They are only maintained to the extent that I'm still using them.
 You're welcome to fork on Github or by other means, and I would aim to
 merge contributions as time allows.
 
+
+=head1 PLANS & IDEAS
+
+Vapourware.
+
+=head2 git backup-stash
+
+Something to generate a commit which could usefully be included in a
+backup, to record more about the repo state, referencing some or all
+of
+
+=over 4
+
+=item * all stashes in the reflog
+
+=item * other extant commitids from reflogs
+
+This would allow recovery of not-yet-garbage-collected commits, from
+commitid-based repository backups.  Possibly neat, but unlikely to be
+useful?
+
+=item * comment or extra file containing the reflog and head stash ref
+
+=item * some of .git/config and related files?
+
+=item * Untracked files.  Call it a tristash (staged, unstaged,
+untracked)
+
+Use another index?  Define size limits?
+
+Ignored files?  What about files to exclude for security reasons?
+
+=item * a tar of some .git/ internals
+
+ logs/
+ hooks/
+ config
+ info/exclude
+ info/grafts
+ COMMIT_EDITMSG
+ GITGUI_BCK
+ description
+ objects/info/alternates
+
+ git-svn state
+ gitweb config
+
+ hardlink counts & inode info for packfiles
+    In combination with related matching backups could be used to
+    reconstruct the hardlinked arrangement.  If you were desperate.
+
+Many of these are things you wouldn't want to just restore.
+
+=back
+
+It will look like a huge merge (but isn't).
+
+Related possibly useful things,
+
+=over 4
+
+=item * operations to reverse these back into reflog & stash, or
+extract any one to become the current stash
+
+=item * something that makes this tree clearly not part of the
+project.
+
+Empty, except for a shell script to help with the restoration?
+
+=back
+
+Naming
+
+ git stashbranch
+ git stash-branch
+ git backup-stashes
+ git _backup-stashes # we may assume it is called from cron, so avoid eating namespace?
+
+
 =head1 AUTHOR
 
 I have written them in the course of my work for
