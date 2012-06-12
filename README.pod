@@ -128,6 +128,18 @@ Naming
  git backup-stashes
  git _backup-stashes # we may assume it is called from cron, so avoid eating namespace?
 
+=head2 git do-sync
+
+(Have already implemented part of this as a tool inside my reminders
+textfile repo.)
+
+ commit (staged, changed, autosaved) files
+ at both ends
+ then (pull --rebase; push; remote ff) or similar
+
+Configurable for rebase vs. merge, to allow for more than a pair of
+repos.
+
 
 =head1 AUTHOR
 
