@@ -13,3 +13,4 @@ git-rebase-topswap
 git-st
 git-undzil
 git-up
+git-log1

@@ -1,0 +1,5 @@
+#! /bin/sh
+
+one=${1:--1}
+
+PAGER= git log $one --format=fuller
