@@ -20,7 +20,7 @@ Then it adds and commits everything.  Install errors should cause a
 clean reset, leaving a tag on any partial install files.
 --
 help     Show help
-L,lldir Directory to operate upon.  Takes default from git-ll-init(1).
+L,lldir= Directory to operate upon.  Takes default from git-ll-init(1).
 v,verbose! More noise"
 
 . "$(git --exec-path)/git-sh-setup"
