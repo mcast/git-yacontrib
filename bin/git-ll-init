@@ -58,7 +58,7 @@ ll_exist() {
 }
 
 ll_check_version() {
-    local vsn
+    local vsn incomplete
     if ! [ -d '.git' ]; then
 	printf "%s: Found %s, but it is not the top of a Git working tree\n" \
 	    "$prog" "$PWD" >&2
@@ -66,6 +66,10 @@ ll_check_version() {
     elif ! [ -w '.git/HEAD' ]; then
 	printf "%s: %s does not look writable\n" "$prog" "$PWD" >&2
 	false
+    elif incomplete="$( git config --get git-ll.incomplete )"; then
+        printf "Found %s has incomplete initialisation (git-ll.incomplete=%s)\n Please fix or delete & start again\n" \
+            "$PWD" "$incomplete"
+        false
     elif vsn="$( git config --get git-ll.version )"; then
 	$verb_printf "Found %s (version=%s)\n" \
 	    "$PWD" "$vsn"
@@ -96,13 +100,15 @@ ll_create_empty() {
 	cd "$1" && \
 	git init $verb_q && \
 	git commit $verb_q --allow-empty -m "$( printf "Initial empty commit.\n\nMade by %s %s\nat %s\non %s (%s)\n" "$0" "$vsn" "$PWD" "$( hostname )" "$( uname -a )" )" && \
+	git config --add git-ll.incomplete "empty" && \
 	git config --add git-ll.version "$vsn"
 }
 
 ll_create_done() {
     echo "# You might want something here..." > .gitignore
     git add $verb_v -A . && \
-	git commit $verb_q -m "init complete"
+	git commit $verb_q -m "init complete" && \
+	git config --unset git-ll.incomplete
 }
 
 ll_setup_perl5() {
