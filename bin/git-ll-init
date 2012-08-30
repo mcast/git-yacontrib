@@ -107,8 +107,10 @@ ll_create_done() {
 
 ll_setup_perl5() {
     # XXX: deal with absence of local::lib
+    # XXX: copy some %ENV, particularly $PATH (to find perl); let the user intervene here?  before/after obtaining local::lib?  should doing that be an option on git-ll-cpanm, instead of inline here, to reuse the committer?
     perl "-Mlocal::lib=." > perl5.sh
     # XXX: also need cpanm & some config
+    # XXX: subst to have directory once, or derived; bit not suggesting it's relocatable
 }
 
 
