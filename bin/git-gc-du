@@ -1,0 +1,32 @@
+#! /bin/sh
+
+# A variant on "git gc --auto", which goes by object count (and I have
+# found this ineffective in Precise 1.7.0.4)
+#
+# Probably requires the GNU du
+
+DULIM="$( git config --get gc.du )"
+DULIM=${1:-${DULIM:-200}}
+
+if [ "$1" = '-h' ]; then
+    printf 'Syntax: %s [ <mebibytes> ]\n
+Run git-gc if objects currently use more than limit.\n
+Default limit is taken from
+  git config gc.du <mebibytes>
+
+or otherwise defaults to 200.\n\n' "$(basename "$0" )" >&2
+    exit 1
+fi
+
+
+dumegs() {
+    du -sm "$@" | cut -f1
+}
+
+DUOBJ="$( dumegs --exclude .git/objects/pack .git/objects )"
+
+if [ $DUOBJ -gt $DULIM ]; then
+    echo ": Objects using $DUOBJ MiB, exceeds limit $DULIM"
+    git gc
+    echo ": Packs now use $( dumegs .git/objects/pack ) MiB, remaining objects $( dumegs --exclude .git/objects/pack .git/objects ) MiB"
+fi

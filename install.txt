@@ -2,6 +2,7 @@ git-ci
 git-co
 git-ff
 git-g
+git-gc-du
 git-gk
 git-head
 git-iec
