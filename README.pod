@@ -1,0 +1,65 @@
+=head1 DESCRIPTION
+
+These are the sort of small Git extension scripts I would keep in
+C<~/bin/> and have on my path, or put in C<~/.gitconfig section
+[alias]>.  The project is named "mca-wtsi/git-yacontrib".
+
+=head1 INSTALLATION
+
+=head2 "Throw them in the ~/bin"
+
+The current plan is to "install" them via symlinks,
+  ln -snvf ../../../gitwk-github/scripts/bin/{git-rebase-topswap,pidfzap} ~/bin/
+
+or include the bin/ on PATH.
+
+Running the supplied script with
+
+ ./install -y ~/bin
+
+will do this for you, in the way I currently prefer.  You must put
+that C<~/bin> on C<PATH> yourself.
+
+=head2 The scary scripts
+
+Some scripts are too destructive to leave lying around on your PATH if
+you don't know the name.  These may be installed, as a separate set,
+with
+
+ ./install -yS ~/bin
+
+=head2 Details
+
+For "installation" of multiple scripts from some source repositories,
+I prefer to symlink a parent directory and then symlink various
+scripts through that, so
+
+ ,git-yacontrib -> $HOME/gitwk-ext/git-yacontrib/bin
+ git-k -> ,git-yacontrib/git-k
+ git-st -> ,git-yacontrib/git-st
+  ...
+
+so it's obvious which remaining files (presumably saved straight from
+editor to ~/bin) ought to be put in version control.
+
+The set of files installed is defined by F<install*.txt>.
+
+=head1 MAINTENANCE
+
+They are only maintained to the extent that I'm still using them.
+You're welcome to fork on Github or by other means, and I would aim to
+merge contributions as time allows.
+
+=head1 AUTHOR
+
+I have written them in the course of my work for
+http://www.sanger.ac.uk/ and for personal use.
+
+The project is released under GPLv2 or later, per local policy.
+
+(I realise this is far to vague to form a reliable declaration of
+"release under GPLv2" except where explicit but marking for release
+takes time, and it's probably better to make the thing visible and
+wait for someone to ask for clarification.)
+
+=cut
