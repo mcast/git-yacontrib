@@ -14,7 +14,7 @@ EOF
 fi >&2
 
 if [ $# != 0 ]; then
-    echo 'git g: takes no arguments (yet)' >&2
+    echo 'git g: takes no arguments (yet; git gk does)' >&2
     exit 1
 fi
 

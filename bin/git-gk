@@ -23,5 +23,9 @@ if [ -n "$1" ]; then
     shift
 fi
 
+# cdup to top of repo, else gitk behaves oddly (or is it a feature?)
+cdup="$( git rev-parse --show-cdup )"
+[ -n "$cdup" ] && cd "$cdup"
+
 git k
 git g
