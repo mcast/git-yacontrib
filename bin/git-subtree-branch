@@ -3,6 +3,8 @@
 # Make a branch containing a subtree.
 #
 # Borrows some ideas from git-filter-branch in core-git.
+#
+# See instead https://github.com/operasoftware/git-splitter
 
 
 warn () {
