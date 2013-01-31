@@ -1,5 +1,29 @@
 #! /bin/sh
 
+# Create an "initial empty commit" in the repository.
+#
+# Rationale (munged from what I just wrote at https://github.com/Anacode/cvs2git-wrap/commit/aa1ccd8c36 )
+#
+# * When viewing commit diffs in gitk, there is no diff for the
+#   initial commit. This in turns means that searches for commit
+#   "adding/removing string" will not show that commit, even if the
+#   initial tree contains the string.
+#
+# * When grafting a new commit tree onto an existing project, it makes
+#   sense to me for both have a common tree at some point.  That point
+#   it the initial commit.
+#
+# * To easily distinguish different repositories from each other, or
+#   match up clones, one property that could be useful is the
+#   commitid(s) of the set of commits with no parents.
+#
+#   This is something I do not yet use, but plan to try.
+#
+# Compare
+#   http://stackoverflow.com/questions/5479823/automatically-commit-an-empty-gitignore-file-after-git-init
+#   http://kevin.deldycke.com/2010/05/initialize-git-repositories/
+
+
 SUBDIRECTORY_OK=1
 OPTIONS_SPEC="\
 git iec
