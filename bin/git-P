@@ -1,0 +1,11 @@
+#! /bin/sh
+
+if [ "$*" = "-h" ]; then
+    echo 'usage: git-P ...
+
+git-P is a shortcut for
+     git --no-pager ...
+ or  git ... | cat' >&2
+else
+    exec git --no-pager "$@"
+fi
