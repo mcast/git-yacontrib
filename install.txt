@@ -10,9 +10,9 @@ git-iec
 git-k
 git-ll-cpanm
 git-ll-init
+git-log1
 git-qcommit
 git-rebase-topswap
 git-st
 git-undzil
 git-up
-git-log1
