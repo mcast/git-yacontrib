@@ -67,6 +67,30 @@ ll_main() {
     done
 }
 
+ll_script_does_use() {
+    local instwith instperl fatal instwith_perl msg
+
+    instwith="$1"
+    fatal=$2
+    instperl="$( which perl )" || \
+        die "$prog: no perl?!  Cannot proceed"
+
+    instwith_perl="$( head -n1 $instwith | sed -e 's/^[#! ]*//; s/ .*//' )"
+    if [ "$instperl" != "$instwith_perl" ]; then
+        msg="$prog: Found $instwith but it uses $instwith_perl, and
+  PATH suggests you want to use $instperl"
+        if [ -n "$fatal" ]; then
+            die "${msg}
+Cannot continue."
+        else
+            echo "[w] $msg - trying another" >&2
+            false
+        fi
+    else
+        true
+    fi
+}
+
 ll_install() {
     local instwhat instwith instret
     instwhat="$1"
@@ -81,6 +105,15 @@ ll_install() {
 
     instwith="$( which cpanm || which cpan )" || \
 	die "$prog: no cpanm or cpan, cannot proceed"
+
+    # Check that chosen installer is for expected Perl.
+    # Getting it wrong is very confusing.
+    if ! ll_script_does_use "$instwith"; then
+        instwith="$( which cpan )"
+        ll_script_does_use "$instwith" fatal
+        # Running "perl $instwith $instwhat" is likely to break
+        # due to lack of modules
+    fi
 
     echo "[i] $instwith $instwhat" >&2
     "$instwith" "$instwhat"
