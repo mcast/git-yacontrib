@@ -92,7 +92,7 @@ Cannot continue."
 }
 
 ll_install() {
-    local instwhat instwith instret
+    local instwhat instwith instret logfn logtxt
     instwhat="$1"
 
     # We want one commit for our work, so push any other dirty files
@@ -115,10 +115,19 @@ ll_install() {
         # due to lack of modules
     fi
 
+    # Keeping transcript of build means
+    #   - stdout/stderr are merged
+    #   - cpan(1) will take defaults because it cannot ask questions
+    #   - we put the noise in commit log; could go in a committed file instead
+    logfn="$( mktemp --tmpdir git-ll-cpanm.XXXXXX )"
+
     echo "[i] $instwith $instwhat" >&2
-    "$instwith" "$instwhat"
+    set -o pipefail
+    "$instwith" "$instwhat" 2>&1 </dev/null | tee "$logfn"
     instret=$?
     echo "[d] $0: $instwith $instwhat: returned $instret" >&2
+    logtxt="$( sed -e 's/^/  /' "$logfn" )"
+    rm -f "$logfn"
 
     git add -A .
     if git diff --cached --quiet --exit-code; then
@@ -126,7 +135,12 @@ ll_install() {
 	# Nothing changed.  Install was no-op or clean fail.
 	echo "[d] $0: nothing to commit" >&2
     else
-	git commit -m "(+) $instwith $instwhat"
+	git commit -m "(+) $instwith $instwhat
+
+Perl is $instperl
+
+Log:
+$logtxt"
 
 	if [ $instret != 0 ]; then
 	    # Install failed, files changed.  We clean up.
