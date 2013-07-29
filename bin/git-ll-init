@@ -49,10 +49,14 @@ ll_exist() {
 	cd "$llrel" 2>/dev/null && \
 	    cd "$lldir" 2>/dev/null && \
 	    ( # Directory exists
-	    ll_check_version >&2 && \
+            $verb_printf "[d] Specified directory exists, checking suitability\n" >&2
+	    if ll_check_version >&2; then
 		pwd
-	    # If it is not OK, emit nothing to prevent ll_create
-	    true
+            else
+                printf "  Existing directory is unsuitable.\n  If you want to initialise a new directory, it must not yet exist.\n" >&2
+	        # Emit nothing to prevent ll_create
+	        true
+            fi
 	)
     )
 }
