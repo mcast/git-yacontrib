@@ -71,9 +71,8 @@ ll_script_does_use() {
     local instwith instperl fatal instwith_perl msg
 
     instwith="$1"
-    fatal=$2
-    instperl="$( which perl )" || \
-        die "$prog: no perl?!  Cannot proceed"
+    instperl="$2"
+    fatal=$3
 
     instwith_perl="$( head -n1 $instwith | sed -e 's/^[#! ]*//; s/ .*//' )"
     if [ "$instperl" != "$instwith_perl" ]; then
@@ -92,7 +91,7 @@ Cannot continue."
 }
 
 ll_install() {
-    local instwhat instwith instret logfn logtxt
+    local instwhat instperl instperl_vsn instwith instret logfn logtxt
     instwhat="$1"
 
     # We want one commit for our work, so push any other dirty files
@@ -103,14 +102,17 @@ ll_install() {
     git diff --cached --quiet --exit-code || \
 	git commit -m '(files unstaged before install op)'
 
+    instperl="$( which perl )" || \
+        die "$prog: no perl?!  Cannot proceed"
+    instperl_vsn="$( $instperl -MConfig -e 'print $Config{version}' )"
     instwith="$( which cpanm || which cpan )" || \
 	die "$prog: no cpanm or cpan, cannot proceed"
 
     # Check that chosen installer is for expected Perl.
     # Getting it wrong is very confusing.
-    if ! ll_script_does_use "$instwith"; then
+    if ! ll_script_does_use "$instwith" "$instperl"; then
         instwith="$( which cpan )"
-        ll_script_does_use "$instwith" fatal
+        ll_script_does_use "$instwith" "$instperl" fatal
         # Running "perl $instwith $instwhat" is likely to break
         # due to lack of modules
     fi
@@ -139,7 +141,7 @@ ll_install() {
     else
 	git commit -m "(+) $instwith $instwhat
 
-Perl is $instperl
+Perl is $instperl_vsn from $instperl
 
 Log:
 $logtxt"
