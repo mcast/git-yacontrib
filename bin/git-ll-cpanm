@@ -121,6 +121,8 @@ ll_install() {
     #   - we put the noise in commit log; could go in a committed file instead
     logfn="$( mktemp --tmpdir git-ll-cpanm.XXXXXX )"
 
+    [ -z "$PERL_CPANM_OPT" ] && export PERL_CPANM_OPT="--verbose"
+
     echo "[i] $instwith $instwhat" >&2
     set -o pipefail
     "$instwith" "$instwhat" 2>&1 </dev/null | tee "$logfn"
