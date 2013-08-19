@@ -160,9 +160,20 @@ repos.
 
 =head1 SEE ALSO
 
-https://metacpan.org/module/App::IsGitSynced
+=over 4
 
-https://github.com/aspiers/git-config
+=item https://metacpan.org/module/App::IsGitSynced
+
+=item https://github.com/aspiers/git-config
+
+=item Github tools
+
+L<https://github.com/github/hub>
+L<App::GitHubPullRequest>
+
+(via L<http://www.dagolden.com/index.php/2065/how-ive-started-managing-github-pulls/>)
+
+=back
 
 
 =head1 AUTHOR
