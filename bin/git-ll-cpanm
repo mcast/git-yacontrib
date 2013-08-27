@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /bin/bash
+# Bash for pipefail
 
 SUBDIRECTORY_OK=1
 NONGIT_OK=1
