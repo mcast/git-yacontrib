@@ -160,6 +160,8 @@ repos.
 
 =head1 SEE ALSO
 
+https://metacpan.org/module/App::IsGitSynced
+
 https://github.com/aspiers/git-config
 
 
