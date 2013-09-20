@@ -1,0 +1,256 @@
+#! /usr/bin/perl
+package Git::Rehash::Pluggable;
+use strict;
+use warnings;
+
+=head1 NAME
+
+git-rehash - generate input for "${foo}sum -c"
+
+=head1 SYNOPSIS
+
+ git rehash [ --checkable ] [ --digest <algo_base> ] [ --git-prefix ] <treeish>
+
+ git-rehash -d sha512_hex -c master~3 > files.sha512
+ sha512sum -c files.sha512
+
+=head1 DESCRIPTION
+
+This tool emits on STDOUT the cryptographic digests of the files in
+the requested tree.  The purpose is to provide easy access to some
+stronger digests than Git's native SHA1, for example to submit to a
+timestamping service.
+
+=head2 File tree (or commit) selection
+
+If no treeish is given, it defaults C<HEAD>.
+
+Normally the current working directory can reduce the set of files
+selected, and their apparent filename.
+
+Further options may be passed to C<git ls-tree> if they are all
+preceeded with C<-->, so C<-- --full-tree HEAD> is equivalent to
+C<cd>ing up to the top of the repository before running.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --checkable | -C
+
+When set, the output format is suitable for input to commands like
+C<sha1sum -c> or C<md5sum -c> from GNU coreutils - the exact program
+depending on the digest type.
+
+Every file is given the "binary" flag, since Git treats files as blobs
+of data.  This should make no difference in Un*x, but might avoid
+false negatives when checking elsewhere.
+
+Without this option, the hash value is prepended to the output of
+C<git ls-tree> which drives file iteration.
+
+=item --digest | -d <algo_base>
+
+This options specify the digest type, in something similar to the Perl
+naming style.
+
+The options for base are C<hex>, C<b64> == C<base64> and C<raw>.
+
+The options for algo are C<md5>, C<sha1> or any other supported size
+e.g. C<sha512>.
+
+Default is currently C<sha256_hex>.
+
+=item --git-prefix | -G
+
+By default, only the blob's data is hashed.  This is how most digest
+utilities operate.
+
+With this option the type and length of the blob are prepended, in the
+same way Git does when calculating SHA1s for commits or other objects.
+The option set C< -G -d sha1_hex > allows comparison of the
+recalculation with the native id values.
+
+=back
+
+=head1 AUTHOR
+
+ Copyright (c) 2013 Genome Research Ltd.
+ Author: Matthew Astley <mca@sanger.ac.uk>
+
+This file is part of "git-yacontrib".
+
+"git-yacontrib" is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+use Getopt::Long 'GetOptionsFromArray';
+# also needs Digest::*
+
+main(@ARGV) unless caller(); # a modulino == callable as a script
+
+sub main { # not a method
+    my (@arg) = @_;
+    my $self = __PACKAGE__->new(@arg);
+    return $self->run;
+}
+
+sub new {
+    my ($pkg, @arg) = @_;
+    my $self = { digest => 'sha256_hex' };
+    bless $self, $pkg;
+    my @opt = qw( help|h digest|d=s checkable|C git-prefix|G );
+    GetOptionsFromArray(\@arg, $self, @opt)
+      or $$self{help} = 'Syntax error';
+    $$self{treeish} = \@arg;
+    return $self;
+}
+
+sub run {
+    my ($self) = @_;
+
+    $self->show_syntax if $$self{help};
+
+    foreach my $ln ($self->get_tree) {
+        my ($mode, $type, $sha1, $len, $name, $orig) = @$ln;
+        my $pfx = "$type $len\x00"; # what Git uses when hashing
+
+        my ($dig, $dig_base, $post) = $self->_find_hasher;
+        $dig->add($pfx) if $$self{'git-prefix'};
+
+        my $catfile = $self->catfile($type, $sha1);
+        my $bytes = $self->shovel($catfile, [ $dig, 'add' ]);
+        die "Incorrect byte count for $type $sha1: expected $len, got $bytes"
+          unless $len == $bytes;
+
+        my $result = $dig->$dig_base; # finalise digest
+        $result = $post->($result) if $post; # post-process: pad b64
+
+        print($$self{checkable}
+              ? "$result *$name\n"
+              : "$result $orig\n");
+    }
+    return 0;
+}
+
+
+sub get_tree {
+    my ($self) = @_;
+    my @treeish = @{ $$self{treeish} };
+    @treeish = qw( HEAD ) unless @treeish;
+    my @cmd = (qw{ git ls-tree -rlz }, @treeish);
+    my $pid = open my $fh, '-|', @cmd
+      or die "Pipe from @cmd: $!";
+    my @ln;
+    {
+        local $/ = "\x00";
+        @ln = <$fh>;
+        chomp @ln;
+    }
+    foreach (@ln) {
+        # $mode, $type, $sha1, $len, $name, $orig
+        $_ = [ (split /[ \t]+/, $_), $_ ];
+    }
+
+    return @ln;
+}
+
+sub catfile {
+    my ($self, $type, $sha1) = @_;
+    my @cmd = (qw{ git cat-file }, $type, $sha1);
+    my $pid = open my $fh, '-|', @cmd
+      or die "Pipe from @cmd: $!";
+    return $fh;
+}
+
+sub show_syntax {
+    my $prog = $0;
+    $prog =~ s{.*/}{};
+    $prog =~ s{^git-}{git };
+    print "Syntax: $prog \[ --checkable ] [ --git-prefix ] [ --digest <d> ] <treeish [ <path> ] >\n
+
+Send to stdout a digest, made with digest <d>, of the Git tree named
+by a <treeish> which 'git ls-tree' understands.\n";
+
+    exit 1;
+}
+
+
+sub _find_hasher {
+    my ($self) = @_;
+    my $dig_info = $$self{dig_info} ||= $self->_parse_hash($$self{digest});
+    my ($dig_class, $dig_alg, $dig_base) = @$dig_info;
+    my $post = $dig_base eq 'b64digest' ? $self->can('__b64_pad') : undef;
+    return ($dig_class->new($dig_alg), $dig_base, $post);
+}
+
+sub _parse_hash {
+    my ($self, $digest) = @_;
+    my ($dig_class, $dig_alg, $dig_base);
+    if ($digest =~ m{^(md5|sha)}) {
+        my $type = $1;
+        $dig_class = "Digest::\U$type";
+        ($dig_alg, $dig_base) = $digest =~
+          m{^((?:md|sha)\d+_(raw|hex|b64|base64))$}
+            or die "Cannot get hash algo+radix for $dig_class from $digest";
+        $dig_base =~ s/ase|raw//;
+        $dig_base = "${dig_base}digest";
+        $dig_alg =~ s/_.*//;
+    } else {
+        die "Unknown hash type '$digest'";
+    }
+    eval "require $dig_class"
+      or die "Failed to load hash $dig_class: $@";
+
+    die "Failed to find digest function in $dig_class"
+      unless $dig_class->can('addfile');
+
+    return [ $dig_class, $dig_alg, $dig_base ];
+}
+
+sub __b64_pad {
+    my ($b64_digest) = @_;
+
+    # from Digest::SHA docs
+    while (length($b64_digest) % 4) {
+        $b64_digest .= '=';
+    }
+
+    return $b64_digest;
+}
+
+
+sub shovel {
+    my ($self, $fh, $call, $what) = @_;
+    my ($obj, $method) = @$call;
+    my ($tot, $nread) = (0);
+    my $buf;
+    while (1) { # ends with last
+        $nread = read($fh, $buf, 102400);
+        if (!defined $nread) {
+            die "Error reading $what: $!";
+        } elsif (!$nread) {
+            # EOF
+            last;
+        } else {
+            $tot += $nread;
+            $obj->$method($buf); # append to hash
+        }
+    }
+
+    return $tot;
+}
+
+
+1;
