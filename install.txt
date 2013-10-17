@@ -2,7 +2,6 @@ git-P
 git-ci
 git-co
 git-ff
-git-find
 git-g
 git-gc-du
 git-gk
