@@ -252,13 +252,15 @@ sub do_fix {
             return;
         }
         my $new_mode = $chmod{$key};
+        my $new_omode = sprintf("0%o", $new_mode);
+        print "$fn: mode $omode, should be $new_omode\n";
         if (!$fix) {
             # dry run
             $exit |= 4;
         } elsif (chmod $new_mode, $fn) {
             # fixed
         } else {
-            my $fail = sprintf("chmod 0%o: %s", $new_mode, $!);
+            my $fail = "chmod $new_omode: $!";
             if ($type eq 'f') {
                 my $refail = do_replace_file($fn, $fail);
                 $fail = $refail ? "chmod harder: $fail, $refail" : undef;
