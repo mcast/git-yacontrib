@@ -1,0 +1,359 @@
+#! /usr/bin/perl
+use strict;
+use warnings;
+
+use File::Find;
+use File::Temp ();
+use File::Copy qw( copy );
+
+
+=head1 NAME
+
+git permsfix-shared-clone - mend permissions on shared checkout
+
+=head1 SYNOPSIS
+
+ git init --shared=group new_dir
+ cd new_dir
+ git remote add origin $url
+ git fetch
+
+ # later
+
+ cd new_dir
+ git permsfix-shared-clone        # diagnose problems (dry run)
+ git permsfix-shared-clone --fix
+
+
+=head1 DESCRIPTION
+
+After creating a multi-user shared repository (as above), making it
+work without permissions problems has proved tricky for us.
+
+This script aims to diagnose problems, and fix them where other
+permissions allow.
+
+The expected group owner is taken from F<.git/config>.
+
+=head2 Return codes
+
+=over 4
+
+=item 0
+
+Either problems were found, explained on STDOUT and fixed
+successfully; or no problems were found.
+
+=item 4
+
+Problems were found.  They were not requested to be fixed, or could
+not all be fixed and this was explained on STDERR.
+
+=item 255
+
+Some other error...
+
+=back
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item --fix
+
+Supply this option to (attempt to) make changes.  This may cause
+errors, if permissions do not allow fixes to be made.
+
+=back
+
+
+=head1 CAVEATS
+
+C<git clone --shared> is very different to C<git init --shared>, and
+not relevant here.
+
+Use of shared Git clones which are written by different users is
+something unusual.
+
+This script assumes a Un*x-like filesystem.  It ignores ACLs, seeing
+only the POSIX modes.
+
+Script does no locking.  Some locking would be advisable on any
+multi-user directory.
+
+
+=head1 AUTHOR
+
+ Copyright (c) 2013 Genome Research Ltd.
+ Author: Matthew Astley <mca@sanger.ac.uk>
+
+This file is part of "git-yacontrib".
+
+"git-yacontrib" is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+
+sub main {
+    my (@arg) = @_;
+
+    my $fix = 0;
+    if (1 == @arg && $arg[0] eq '--fix') {
+        $fix = 1;
+        shift @arg;
+    } elsif (0 == @arg) {
+        # no args
+    } else {
+        die "Syntax: $0 [ --fix ]\n";
+    }
+
+
+    my ($has_work, $top, $gitdir) = pipefrom
+      (qw( git rev-parse --is-inside-work-tree --show-toplevel --git-dir ));
+    die "$0: not in a work tree" unless $has_work eq "true\n";
+    chomp $top;
+    chomp $gitdir;
+
+    # failure of this (e.g. key absent) is not handled prettily
+    my ($shared) = pipefrom
+      (qw( git config --get core.sharedRepository ));
+    chomp $shared;
+
+    my @ok_shared = (1, 2);
+    die "$0: expected core.sharedRepository in (@ok_shared), got $shared"
+      unless grep { $_ eq $shared } @ok_shared;
+
+    my $ff_only = pipefrom
+      (qw( git config --get receive.denyNonFastforwards ));
+    die "$0: expected receive.denyNonFastforwards=true, got $ff_only"
+      unless $ff_only eq "true\n";
+
+    my $cfg_fn = "$gitdir/config";
+    my $gid = (stat $cfg_fn)[5];
+    die "$0: expected $cfg_fn to be file" unless defined $gid && -f _;
+
+    return do_fix($shared, $fix, $top, $gid);
+}
+
+sub pipefrom {
+    my @cmd = @_;
+    open my $fh, '-|', @cmd
+      or die "pipefrom @cmd: $!";
+
+    my @out;
+    @out = (wantarray ? (<$fh>) : (scalar <$fh>));
+
+    if (close $fh) {
+        return wantarray ? @out : $out[0];
+    } else {
+        my $err = $! || exitstr($?);
+        die "pipefrom @cmd: $err";
+    }
+}
+
+sub exitstr {
+    my ($qu) = @_;
+
+    return ($qu & 127
+            ? sprintf("killed (#%d)", $qu & 127)
+            : sprintf("exit code %d", $qu >> 8));
+}
+
+sub do_fix {
+    my ($shared, $fix, $top, $want_gid) = @_;
+    my $want_group = group_name($want_gid);
+
+    my %user_run;
+    my $exit = 0;
+
+    my %chmod =
+      (# correct
+       'd 02775' => undef,
+       'f 0664' => undef,
+       'f 0775' => undef,
+       'f 0444' => undef,
+
+       # change them
+       'd 0755' => 02775,
+       'd 0775' => 02775,
+       'd 02755' => 02775,
+       'f 0644' => 0664,
+       'f 0755' => 0775, # executable!
+
+       'f 0464' => 0444, # was probably given an enthusiastic g+w
+
+       # other - uncorrectable, possibly a bug in this script
+      );
+
+    my $code = sub {
+        my $fn = $_;
+        my @lstat = lstat $fn;
+        my $type;
+        if (-l _) {
+            return;
+        } elsif (-d _) {
+            $type = 'd';
+
+            if ($fn ne $top && -d "$fn/.git") {
+                warn "$fn/ - not descending into submodule\n";
+                $File::Find::prune = 1;
+            }
+        } elsif (-f _) {
+            $type = 'f';
+        } else {
+            die "$0: Unknown type of $fn";
+        }
+
+        # Fix the group?
+        my ($uid, $gid) = @lstat[4, 5];
+        if ($gid != $want_gid) {
+            my $group = group_name($gid);
+            print "$fn: group owner $group, should be $want_group\n";
+            if (!$fix) {
+                # dry run
+                $exit |= 4;
+            } else {
+                my $fail = do_chgrp($want_gid, $type, $fn);
+                if ($fail) {
+                    warn "$fn: $fail\n";
+                    $user_run{$uid} ++;
+                    $exit |= 4;
+                } # else fixed
+                @lstat = lstat $fn;
+                ($uid, $gid) = @lstat[4, 5];
+            }
+        }
+
+        # Fix the mode?
+        my $mode = $lstat[2] & 07777;
+        my $omode = sprintf("0%o", $mode);
+        my $key = "$type $omode";
+        if ($gid != $want_gid) {
+            # no point trying to fix this
+            return;
+        } elsif (!exists $chmod{$key}) {
+            warn "$fn: don't know how to correct '$key'\n";
+            $exit |= 4;
+            return;
+        } elsif (!defined $chmod{$key}) {
+            # nothing to fix
+            return;
+        }
+        my $new_mode = $chmod{$key};
+        if (!$fix) {
+            # dry run
+            $exit |= 4;
+        } elsif (chmod $new_mode, $fn) {
+            # fixed
+        } else {
+            my $fail = sprintf("chmod 0%o: %s", $new_mode, $!);
+            if ($type eq 'f') {
+                my $refail = do_replace_file($fn, $fail);
+                $fail = $refail ? "chmod harder: $fail, $refail" : undef;
+            }
+            if ($fail) {
+                warn "$fn: $fail\n";
+                $user_run{$uid} ++;
+                $exit |= 4;
+            }
+        }
+
+        return;
+    };
+
+    find({ wanted => $code, no_chdir => 1 }, $top);
+
+    warn sprintf("You may need user%s (%s) to run $0 for you\n",
+                 1 == keys %user_run ? '' : 's',
+                 (join ' ', map { user_name($_) }
+                  sort(keys %user_run)))
+      if keys %user_run;
+
+    return $exit;
+}
+
+sub do_chgrp { # no dry-run here
+    my ($gid, $type, $fn) = @_;
+    my $fail;
+    my $exit = system(qw( chgrp -v ), $gid, $fn);
+    $fail = 'chgrp '.exitstr($exit) if $exit;
+
+    if ($fail && $type eq 'f') {
+        # maybe we can re-write the file
+        my $refail = do_replace_file($fn, $fail);
+        $fail = $refail ? "chgrp harder: $refail" : undef;
+
+    } elsif ($fail && $type eq 'd') {
+        # We could mkdir, then rename all the contained items in, and
+        # swap the directories.
+        #
+        # It would not be atomic, and we could regret starting.
+        # If we can't write the old $fn/ then we won't be able to tidy
+        # up, even if we can move it out of the way to rename in the
+        # replacement.
+    }
+
+    return $fail;
+}
+
+sub do_replace_file {
+    my ($fn, $why) = @_;
+
+    my @dirs = File::Spec->splitdir($fn);
+    my $leaf = pop @dirs;
+    my $dir = File::Spec->catdir(@dirs);
+    my $tmp = File::Temp::tempnam($dir, "$leaf.cp.XXXXXX");
+    print "$fn: $why, will copy+rename via $tmp\n";
+
+    # copying - the parent directory's 02775 should fix our group
+    my $fail;
+    if (!copy($fn, $tmp)) {
+        $fail = "copy failed: $!";
+    } elsif (!rename($tmp, $fn)) {
+        $fail = "rename failed: $!";
+    } # else success
+
+    if ($fail) {
+        # tidy up
+        unlink $tmp or warn "$tmp: unlink failed: $!\n";
+    }
+
+    return $fail;
+}
+
+sub group_name {
+    my ($gid) = @_;
+    my $name = getgrgid($gid);
+    return defined $name ? $name : $gid;
+}
+
+sub user_name {
+    my ($uid) = @_;
+    my $name = getpwuid($uid);
+    return defined $name ? $name : $uid;
+}
+
+#sub read_dir { # want File::Slurp
+#    my ($dir) = @_;
+#    die "wantarray!" unless wantarray;
+#    opendir my $dh, $dir or die "opendir $dir: $!";
+#    my @out =
+#      map { File::Spec->catdir($dir, $_) }
+#        grep { $_ ne '.' && $_ ne '..' }
+#          readdir $dh;
+#    return @out;
+#}
+
+exit main(@ARGV);
