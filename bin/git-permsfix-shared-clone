@@ -68,6 +68,10 @@ errors, if permissions do not allow fixes to be made.
 =back
 
 
+=head1 SEE ALSO
+
+http://serverfault.com/questions/26954/how-do-i-share-a-git-repository-with-multiple-users-on-a-machine
+
 =head1 CAVEATS
 
 C<git clone --shared> is very different to C<git init --shared>, and
