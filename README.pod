@@ -158,6 +158,11 @@ repos.
  #   if nothing to stash, just do command; else we pop an older stash!
 
 
+=head1 SEE ALSO
+
+https://github.com/aspiers/git-config
+
+
 =head1 AUTHOR
 
 I have written them in the course of my work for
