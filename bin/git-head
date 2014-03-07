@@ -7,6 +7,8 @@ git head
 Echo to stdout the current branch name,
 or if we have detached HEAD the commitid.
 
+  But see also http://stackoverflow.com/questions/6245570/get-current-branch-name
+
 Fails if run without a Git repository.
 --
 "
