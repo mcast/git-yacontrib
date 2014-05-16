@@ -86,6 +86,11 @@ only the POSIX modes.
 Script does no locking.  Some locking would be advisable on any
 multi-user directory.
 
+The notion of "installed, and therefore read-only" clashes with "in a
+shared-user Git checkout, and therefore writable".  Files in this
+state will generate errors like C<don't know how to correct 'f 0555'>,
+but this could be improved with a flag like C<--fix-ro>.
+
 
 =head1 AUTHOR
 
