@@ -153,7 +153,7 @@ sub main {
     my $gid = (stat $cfg_fn)[5];
     die "$0: expected $cfg_fn to be file" unless defined $gid && -f _;
 
-    return do_fix($shared, $fix, $top, $gid);
+    return do_fix($fix, $top, $gid);
 }
 
 sub pipefrom {
@@ -181,7 +181,7 @@ sub exitstr {
 }
 
 sub do_fix {
-    my ($shared, $fix, $top, $want_gid) = @_;
+    my ($fix, $top, $want_gid) = @_;
     my $want_group = group_name($want_gid);
 
     my %user_run;
@@ -269,10 +269,19 @@ sub do_fix {
         } elsif (chmod $new_mode, $fn) {
             # fixed
         } else {
-            my $fail = "chmod $new_omode: $!";
+            my $err = $!;
+            my $fail = "chmod $new_omode: $err";
             if ($type eq 'f') {
                 my $refail = do_replace_file($fn, $fail);
-                $fail = $refail ? "chmod harder: $fail, $refail" : undef;
+                if ($refail) {
+                    $fail = "chmod harder: $fail, $refail";
+                } elsif (chmod $new_mode, $fn) {
+                    # fixed
+                    $fail = undef;
+                } else {
+                    $fail = "chmod harder: file replaced, but chmod $new_omode: $!";
+                    die "$fn: $fail; aborting before more files are replaced with incorrect permissions";
+                }
             }
             if ($fail) {
                 warn "$fn: $fail\n";
@@ -321,6 +330,7 @@ sub do_chgrp { # no dry-run here
 
 sub do_replace_file {
     my ($fn, $why) = @_;
+    die "not gong to do_replace_file($fn, $why).  It is broken (not preserving file modes) and a reliable fix will need a test suite, which will need to run under fakeroot";
 
     my @dirs = File::Spec->splitdir($fn);
     my $leaf = pop @dirs;
