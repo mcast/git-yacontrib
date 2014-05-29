@@ -1,0 +1,119 @@
+#! /bin/bash
+# For 'read -d""' and ${var:offset:len}
+# Probably requires GNU find(1) and strftime(3)
+
+SUBDIRECTORY_OK=1
+USAGE="<git-commit(1)-options>*
+
+This inspects 'git status' for staged files,
+cooks up '--date' and '--author' parameters,
+then continues with a plain git-commit(1).
+
+You can give --dry-run to see what will happen,
+it is processed by 'git commit' not this script.
+"
+
+. "$( git --exec-path)/git-sh-setup"
+
+warn() {
+    echo "[w] $@" >&2
+}
+
+showfn() {
+    printf "%s" "$1" | tr -c '[:print:]' '?'
+}
+
+showfile() {
+    find "$1" -printf "%TY-%Tm-%Tdt%TT%Tz %-10u "
+    showfn "$fn"
+    printf "\n"
+}
+
+user2author() {
+    local usr auth me_name me_mail
+    usr="$1"
+    if [ "$( echo "$usr" | wc -l )" != 1 ]; then
+        # $usr is multi-line
+        die Cannot map multiple local users \($usr\) to one author
+    elif git config --get "user2author.$usr"; then
+        # known user.  author was printed
+        return
+    elif [ "$usr" = "$( whoami )" ]; then
+        # self.  no output, use default
+        return
+    else
+        die "Need a user2author mapping for local user $usr.  Please create with
+  git config --global 'user2author.$usr' 'Oo Ber <tops@example.org>'"
+        # Use of this dictionary to map local usernames or uids to
+        # author name and email is my arbitrary but hopefully obvious
+        # convention.
+        #
+        # You can configure per-repo of course, but global seems more
+        # generally useful.
+    fi
+}
+
+get_info() {
+    local line status fn stamp
+
+# http://www.dwheeler.com/essays/filenames-in-shell.html
+#
+# find... while loop, requires find (-print0) and shell (read -d) extensions.
+# Fails on Cygwin; in while loops, filenames ending in \r \n and \n look =.
+# Variable values may be lost unset because loop may run in a subshell.
+    git status --porcelain -z | while IFS="" read -r -d "" line ; do
+        status="${line:0:2}"
+        fn="${line:3}"
+        case "$status" in
+            'M '|'A ') # added or update, something to commit
+                showfile "$fn"
+                ;;
+            AA|AU|DD|DU|UA|UD|UU) # unmerged
+                die "File $(showfn "$fn") unmerged ($status)"
+                ;;
+            '??') # untracked - ignore
+                :
+                warn "Ignoring untracked $(showfn "$fn") until git-add"
+                ;;
+            ' M'|' D') # needs git-add - ignore
+                :
+                warn "Ignoring changed $(showfn "$fn") until git-add"
+                ;;
+            [MA][MD]) # added or updated, but changed since
+                die "File $(showfn "$fn") changed ($status) since staged changes"
+                # could have a --force flag?
+                ;;
+            *) # something else
+                die "git status reports '$status $(showfn "$fn")'
+I don't know what to do with it - aborting"
+            # might be able to deal with some of [RCD][ MD]
+            # but stat which file?  needs testing / YAGNI
+            ;;
+        esac
+    done
+}
+
+main() {
+    set -e
+    unsorted="$( get_info )"
+    sorted="$( echo "$unsorted" | LC_ALL=C sort )"
+    count="$( echo "$sorted" | wc -l )"
+    case $count in
+        0) die "Nothing to commit" ;;
+        1) : ;; # uncontroversial
+        *)
+            echo "(FYI) ascending dates of files to be committed:"
+            echo "$sorted" | sed -e 's/^/  /'
+            ;;
+    esac
+    authdate="$( echo "$sorted" | tail -n1 | cut -d' ' -f1 )"
+    authuser="$( echo "$sorted" | cut -d' ' -f2 | sort -u )"
+    author="$( user2author "$authuser" )"
+    set -x
+    exec git commit \
+        ${author:+--author "$author"} \
+        --date "$authdate" \
+        "$@"
+}
+
+main "$@"
