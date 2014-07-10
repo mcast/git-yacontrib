@@ -114,6 +114,7 @@ main() {
     unsorted="$( get_info )"
     sorted="$( echo "$unsorted" | LC_ALL=C sort )"
     count="$( echo "$sorted" | wc -l )"
+    [ -z "$unsorted" ] && count=0
     case $count in
         0) die "Nothing to commit" ;;
         1) : ;; # uncontroversial
