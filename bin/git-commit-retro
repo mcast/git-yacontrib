@@ -24,7 +24,15 @@ showfn() {
 }
 
 showfile() {
-    find "$1" -printf "%TY-%Tm-%Tdt%TT%Tz %-10u "
+    local fn
+    fn="$1"
+    [ -f "$fn" ] || [ -L "$fn" ] || {
+        local dbg
+        dbg="$( stat "$fn" | sed -e 's/^/  /' )"
+        die "File $(showfn "$fn"): not a file
+$dbg"
+    }
+    find "$fn" -printf "%TY-%Tm-%Tdt%TT%Tz %-10u "
     showfn "$fn"
     printf "\n"
 }
@@ -54,7 +62,7 @@ user2author() {
 }
 
 get_info() {
-    local line status fn stamp
+    local line linecont status fn stamp
 
 # http://www.dwheeler.com/essays/filenames-in-shell.html
 #
@@ -83,6 +91,14 @@ get_info() {
                 die "File $(showfn "$fn") changed ($status) since staged changes"
                 # could have a --force flag?
                 ;;
+            'D ') # deletion to commit.  XXX: consider taking parent directory date?
+                warn "Ignoring staged deletion $(showfn "$fn"): cannot derive a date"
+                ;;
+            'R ') # rename to commit.  XXX: consider taking ctime?
+                IFS="" read -r -d "" linecont
+                warn "Renamed $(showfn "$linecont") -> $(showfn "$fn"): taking mtime"
+                showfile "$fn"
+                ;;
             *) # something else
                 die "git status reports '$status $(showfn "$fn")'
 I don't know what to do with it - aborting"
@@ -102,6 +118,7 @@ main() {
         0) die "Nothing to commit" ;;
         1) : ;; # uncontroversial
         *)
+#            printf "\n\n\n(FYI more) unsorted file info:\n%s\n\n\n" "$unsorted"
             echo "(FYI) ascending dates of files to be committed:"
             echo "$sorted" | sed -e 's/^/  /'
             ;;
