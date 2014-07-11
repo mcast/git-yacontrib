@@ -8,6 +8,7 @@ git-gc-du
 git-gk
 git-head
 git-iec
+git-ireb
 git-k
 git-ll-cpanm
 git-ll-init

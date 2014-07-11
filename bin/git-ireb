@@ -1,0 +1,57 @@
+#! /bin/sh
+
+SUBDIRECTORY_OK=1
+OPTIONS_SPEC="\
+git ireb
+
+Find the furthest back sensible place for an interactive rebase to
+begin, and start one.
+
+Sensible is defined as
+
+ - not including any merge
+
+ - not including any commit with a refs/remotes/* decoration
+
+Currently author/committer is not checked,
+XXX:WIBNI nice to avoid rewriting across 'committer' changes.
+
+Fails if run without a Git repository.
+
+--
+"
+
+. "$(git --exec-path)/git-sh-setup"
+
+
+info() {
+    echo "[i] $@" >&2
+}
+
+rebase_back_to() {
+    local ci pars deco
+    git log --pretty='%H:%p:%d' --decorate=full \
+        | sed -e 's/: *[(]/:/ ; s/[)] *$//' \
+        | while IFS=":" read -r ci pars deco; do
+        echo $ci
+        case "$deco" in
+            '') ;; # no refs
+            refs/remotes/* | *", "refs/remotes/*)
+                info "stop: $ci was pushed ($deco)"
+                break
+                ;;
+        esac
+        case "$pars" in
+            *" "*)
+                info "stop: $ci is a merge ($pars)"
+                break
+                ;;
+        esac
+    done
+}
+
+backto=$( rebase_back_to | tail -n1 )
+[ -n "$backto" ] || die "Found no sensible rebase upstream"
+
+set -x
+exec git rebase -i --autosquash $backto
