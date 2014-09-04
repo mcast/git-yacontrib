@@ -1,0 +1,189 @@
+#! /usr/bin/perl
+use strict;
+use warnings;
+
+use Getopt::Long ();
+use Pod::Usage;
+
+use YAML 'Dump'; # for debug
+
+
+=head1 NAME
+
+git compilation-annotate - put "blame" marks on a standard compilation log
+
+=head1 DESCRIPTION
+
+This is a text filter which adds information from L<git-annotate(1)>.
+
+It accepts lines like C<filename:linenum: text> or
+C<filename:linenum:column: text> and tells who/when that line changed.
+
+Lines from which file location cannot be extracted are passed through
+untouched.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --newer <days> | -n <days>
+
+Show only lines with age newer than this many days.
+
+=item --older <days> | -o <days>
+
+Show only lines with age older than this many days.
+
+=item --email <regexp> | -e <regexp>
+
+Show only lines with email matching this regexp.
+
+=item --not-email <regexp> | -E <regexp>
+
+Omit lines with email matching this regexp.
+
+=item --committer | -C
+
+Use committer info, not author info.
+
+=cut
+
+
+sub main {
+    my %opt;
+    Getopt::Long::Configure(qw( no_ignore_case ));
+    Getopt::Long::GetOptions
+        (\%opt,
+         qw( h|help! committer|C! ),
+         qw( newer|n=f older|o=f email|e=s not-email|E=s ))
+          or pod2usage(2);
+    pod2usage(1) if $opt{help};
+    die "Extra args (@ARGV) not recognised" if @ARGV;
+
+    foreach my $k (qw( email not-email )) {
+        next unless defined $opt{$k};
+        $opt{$k} = qr{$opt{$k}};
+    }
+
+    while (<STDIN>) {
+        my $filtered_ln = "STDIN:$.";
+        if (my ($fn, $line, $col, $txt) =
+            m{^([^:]+):(\d+):(\d+:)?(.*)$}) {
+            my $anno = get_anno($fn, $line);
+            my ($show, $add) = anno2txt($anno, \%opt, $_, $filtered_ln);
+            $_ = $show ? "$fn:$line:$col$add:$txt\n" : '';
+        }
+        print;
+    }
+    return 0;
+}
+
+my %fn; # cache, { fn => \%fetch_anno }
+sub get_anno {
+    my ($fn, $ln) = @_;
+    my $anno = $fn{$fn} ||= fetch_anno($fn);
+    return $anno->{ln_ciid}->[$ln];
+}
+
+sub anno2txt {
+    my ($ci, $opt, $txt, $ln) = @_;
+    my $a_c = $opt->{committer} ? 'committer' : 'author';
+    my $e = $ci->{"$a_c-mail"};
+    my $t = $ci->{"$a_c-time"};
+    die "Missing ci info?\n".Dump({ ci => $ci, input => $txt, line => $ln })
+      unless $e && $t; # if we somehow had no annotate info..?
+
+    $e =~ s{^<|>$}{}g;
+    my $dago = ($^T - $t) / (24 * 3600);
+    return (0,'') if # reasons to omit the line...
+      ((defined $opt->{newer} && $dago > $opt->{newer}) ||
+       (defined $opt->{older} && $dago < $opt->{older}) ||
+       (defined $opt->{email} && $e !~ $opt->{email}) ||
+       (defined $opt->{'not-email'} && $e =~ $opt->{'not-email'}));
+    return (1, sprintf("%3.1fd %s", $dago, substr($e,0,9)));
+}
+
+# %fetch_anno = (ciid => { $ciid => $ci=\%info }, ln_ciid => \@ln_ciid)
+# $ln_ciid[ $file_line_number ] = $ci
+sub fetch_anno {
+    my ($fn) = @_;
+    my @cmd = ("git", "annotate", "-p", $fn);
+    open my $fh, '-|', @cmd
+      or die "Failed to pipe from @cmd: $!";
+    my @ln_ciid;
+    my %ciid;
+    while (<$fh>) {
+        my ($ciid, $ln_src, $ln_final, $ln_count) =
+          m{^([0-9a-f]{40}) (\d+) (\d+)(?: (\d+))?$}
+            or die "Expected ciid header from '@cmd':$.: got $_";
+
+        # Take commit info (if any), then the line content
+        my %info;
+        while (<$fh>) {
+            if (my ($key, $val) = m{^(\S+)\s+(.*)$}) {
+                $info{$key} = $val;
+            } elsif (m{^\t}) {
+                # the file line content - ignore, and continue
+                last;
+            } else {
+                die "Expected KVP or line text from '@cmd':$.: got $_";
+            }
+        }
+        my $ci;
+        if (keys %info) {
+            # New commit info - stash
+            warn "Replaced ciid %info (dup?) for $ciid at '@cmd':$. for $fn:$ln_final"
+              if defined $ciid{$ciid};
+            $ciid{$ciid} = $ci = \%info;
+            $info{ciid} = $ciid;
+        } else {
+            # Need existing info
+            $ci = $ciid{$ciid}
+              or die "No ciid %info for $ciid at '@cmd':$. for $fn:$ln_final";
+        }
+
+        $ln_ciid[$ln_final] = $ci;
+    }
+    return +{ ciid => \%ciid, ln_ciid => \@ln_ciid };
+}
+
+exit main();
+
+
+=head1 BUGS AND CAVEATS
+
+C<$PWD> should be the top of the git repository.  Filenames should be
+relative to that.  These program requirements might be considered bugs
+or an unimplemented feature.
+
+Response could perhaps be faster if the input was buffered, and a
+couple of L<git-annotate(1)> processes ran in parallel.  They're
+probably I/O bound anyway...
+
+Annotate data is cached indefinitely, and in more detail than is used.
+This could be a significant memory hog on a large repository.
+
+Output format is not configurable.
+
+
+=head1 AUTHOR
+
+ Copyright (c) 2014 Genome Research Ltd.
+ Author: Matthew Astley <mca@sanger.ac.uk>
+
+This file is part of "git-yacontrib".
+
+"git-yacontrib" is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+=cut
