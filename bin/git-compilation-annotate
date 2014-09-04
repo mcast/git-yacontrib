@@ -80,7 +80,7 @@ sub main {
             m{^([^:]+):(\d+):(\d+:)?(.*)$}) {
             my $anno = get_anno($fn, $line);
             my ($show, $add) = anno2txt($anno, \%opt, $_, $filtered_ln);
-            $_ = $show ? "$fn:$line:$col$add:$txt\n" : '';
+            $_ = $show ? "$fn:$line:$col $add:$txt\n" : '';
         }
         print;
     }
@@ -172,7 +172,8 @@ probably I/O bound anyway...
 Annotate data is cached indefinitely, and in more detail than is used.
 This could be a significant memory hog on a large repository.
 
-Output format is not configurable.
+Output format is not configurable.  The truncation of email addresses
+is arbitrary.
 
 
 =head1 AUTHOR
