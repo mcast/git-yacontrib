@@ -12,15 +12,24 @@ use YAML 'Dump'; # for debug
 
 git compilation-annotate - put "blame" marks on a standard compilation log
 
+=head1 SYNOPSIS
+
+ # "show me what's wrong with code written in the last 30 days"
+ perlcritic --quiet --nocolour --verbose "%f:%l:%c:%m\t[%s] %p\n" \
+    modules t/modules | git-compilation-annotate -n 30
+
+
 =head1 DESCRIPTION
 
-This is a text filter which adds information from L<git-annotate(1)>.
+This is a stdin/stdout text filter which adds information from
+L<git-annotate(1)>.
 
 It accepts lines like C<filename:linenum: text> or
 C<filename:linenum:column: text> and tells who/when that line changed.
 
 Lines from which file location cannot be extracted are passed through
 untouched.
+
 
 =head1 OPTIONS
 
