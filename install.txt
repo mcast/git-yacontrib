@@ -2,6 +2,7 @@ git-P
 git-ci
 git-co
 git-commit-retro
+git-compilation-annotate
 git-ff
 git-g
 git-gc-du

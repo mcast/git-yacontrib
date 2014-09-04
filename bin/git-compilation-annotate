@@ -1,0 +1,106 @@
+#! /usr/bin/perl
+use strict;
+use warnings;
+
+use YAML 'Dump'; # for debug
+
+
+=head1 NAME
+
+git compilation-annotate - put "blame" marks on a standard compilation log
+
+=head1 DESCRIPTION
+
+This is a text filter which adds information from L<git-annotate(1)>.
+
+It accepts lines like C<filename:linenum: text> or
+C<filename:linenum:column: text> and tells who/when that line changed.
+
+Lines from which file location cannot be extracted are passed through
+untouched.
+
+C<$PWD> should be the top of the git repository.  Filenames should be
+relative to that.  These program requirements might be considered bugs
+or an unimplemented feature.
+
+=cut
+
+
+sub main {
+    die "Takes no args (yet)" if @ARGV;
+
+    while (<STDIN>) {
+        if (my ($fn, $line, $col, $txt) =
+            m{^([^:]+):(\d+):(\d+:)?(.*)$}) {
+            my $anno = get_anno($fn, $line);
+            my $show = anno2txt($anno);
+            $_ = "$fn:$line:$col$show:$txt\n"
+        }
+        print;
+    }
+    return 0;
+}
+
+my %fn; # cache, { fn => \%fetch_anno }
+sub get_anno {
+    my ($fn, $ln) = @_;
+    my $anno = $fn{$fn} ||= fetch_anno($fn);
+    return $anno->{ln_ciid}->[$ln];
+}
+
+sub anno2txt {
+    my ($ci) = @_;
+    my $e = $ci->{'author-mail'} || $ci->{'committer-mail'};
+    my $t = $ci->{'author-time'} || $ci->{'committer-time'};
+    die "Missing ci info?".Dump($ci) unless $e && $t;
+    $e =~ s{^<|>$}{}g;
+    my $dago = ($^T - $t) / (24 * 3600);
+    return sprintf("%3.1fd %s", $dago, substr($e,0,9));
+}
+
+# %fetch_anno = (ciid => { $ciid => $ci=\%info }, ln_ciid => \@ln_ciid)
+# $ln_ciid[ $file_line_number ] = $ci
+sub fetch_anno {
+    my ($fn) = @_;
+    my @cmd = ("git", "annotate", "-p", $fn);
+    open my $fh, '-|', @cmd
+      or die "Failed to pipe from @cmd: $!";
+    my @ln_ciid;
+    my %ciid;
+    while (<$fh>) {
+        my ($ciid, $ln_src, $ln_final, $ln_count) =
+          m{^([0-9a-f]{40}) (\d+) (\d+)(?: (\d+))?$}
+            or die "Expected ciid header from '@cmd':$.: got $_";
+
+        # Take commit info (if any), then the line content
+        my %info;
+        while (<$fh>) {
+            if (my ($key, $val) = m{^(\S+)\s+(.*)$}) {
+                $info{$key} = $val;
+            } elsif (m{^\t}) {
+                # the file line content - ignore, and continue
+                last;
+            } else {
+                die "Expected KVP or line text from '@cmd':$.: got $_";
+            }
+        }
+        my $ci;
+        if (keys %info) {
+            # New commit info - stash
+            warn "Replaced ciid %info (dup?) for $ciid at '@cmd':$. for $fn:$ln_final"
+              if defined $ciid{$ciid};
+            $ciid{$ciid} = $ci = \%info;
+            $info{ciid} = $ciid;
+        } else {
+            # Need existing info
+            $ci = $ciid{$ciid}
+              or die "No ciid %info for $ciid at '@cmd':$. for $fn:$ln_final";
+        }
+
+        $ln_ciid[$ln_final] = $ci;
+    }
+    return +{ ciid => \%ciid, ln_ciid => \@ln_ciid };
+}
+
+exit main();
+
