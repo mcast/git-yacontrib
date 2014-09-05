@@ -77,7 +77,7 @@ sub main {
     while (<STDIN>) {
         my $filtered_ln = "STDIN:$.";
         if (my ($fn, $line, $col, $txt) =
-            m{^([^:]+):(\d+):(\d+:)?(.*)$}) {
+            m{^([^:]+):(\d+):(\d+:|)(.*)$}) {
             my $anno = get_anno($fn, $line);
             my ($show, $add) = anno2txt($anno, \%opt, $_, $filtered_ln);
             $_ = $show ? "$fn:$line:$col $add:$txt\n" : '';
