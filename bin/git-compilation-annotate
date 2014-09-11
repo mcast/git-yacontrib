@@ -63,7 +63,7 @@ sub main {
     Getopt::Long::Configure(qw( no_ignore_case ));
     Getopt::Long::GetOptions
         (\%opt,
-         qw( h|help! committer|C! ),
+         qw( help|h! committer|C! ),
          qw( newer|n=f older|o=f email|e=s not-email|E=s ))
           or pod2usage(2);
     pod2usage(1) if $opt{help};
