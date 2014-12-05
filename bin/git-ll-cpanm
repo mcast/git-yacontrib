@@ -122,7 +122,9 @@ ll_install() {
     #   - stdout/stderr are merged
     #   - cpan(1) will take defaults because it cannot ask questions
     #   - we put the noise in commit log; could go in a committed file instead
-    logfn="$( mktemp --tmpdir git-ll-cpanm.XXXXXX )"
+    logfn="$( mktemp -t git-ll-cpanm.XXXXXX )"
+    # MacOS: mktemp -t works
+    # GNU: mktemp -t gives us a weird filename, but still works
 
     [ -z "$PERL_CPANM_OPT" ] && export PERL_CPANM_OPT="--verbose"
 
