@@ -136,7 +136,7 @@ ll_install() {
     instret=$?
     echo "[d] $0: $instwith $instwhat: returned $instret" >&2
     echo "[d] $0: $instwith $instwhat: returned $instret" >> "$logfn"
-    logstash="buildlogs/$instwhat.$( date +%Ft%T ).log"
+    logstash="buildlogs/$( echo "$instwhat" | tr -s ' ./:' _ ).$( date +%Ft%T ).log"
 
     git add -A .
     if git diff --cached --quiet --exit-code; then
