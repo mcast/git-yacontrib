@@ -92,7 +92,7 @@ Cannot continue."
 }
 
 ll_install() {
-    local instwhat instperl instperl_vsn instwith instret logfn logtxt
+    local instwhat instperl instperl_vsn instwith instret logfn logstash
     instwhat="$1"
 
     # We want one commit for our work, so push any other dirty files
@@ -121,7 +121,9 @@ ll_install() {
     # Keeping transcript of build means
     #   - stdout/stderr are merged
     #   - cpan(1) will take defaults because it cannot ask questions
-    #   - we put the noise in commit log; could go in a committed file instead
+    #   - noise is too big for commit log ("/usr/bin/git: Argument list too long"),
+    #     stash it in a committed file
+    mkdir -p buildlogs
     logfn="$( mktemp -t git-ll-cpanm.XXXXXX )"
     # MacOS: mktemp -t works
     # GNU: mktemp -t gives us a weird filename, but still works
@@ -133,21 +135,24 @@ ll_install() {
     "$instwith" "$instwhat" 2>&1 </dev/null | tee "$logfn"
     instret=$?
     echo "[d] $0: $instwith $instwhat: returned $instret" >&2
-    logtxt="$( sed -e 's/^/  /' "$logfn" )"
-    rm -f "$logfn"
+    echo "[d] $0: $instwith $instwhat: returned $instret" >> "$logfn"
+    logstash="buildlogs/$instwhat.$( date +%Ft%T ).log"
 
     git add -A .
     if git diff --cached --quiet --exit-code; then
 	:
 	# Nothing changed.  Install was no-op or clean fail.
 	echo "[d] $0: nothing to commit" >&2
+        mv "$logfn" "$logstash"~no-op~
+        # logfile should be ignored by (new 2014-12) default .gitignore
     else
+        mv "$logfn" "$logstash"
+        git add "$logstash"
 	git commit -m "(+) $instwith $instwhat
 
 Perl is $instperl_vsn from $instperl
 
-Log:
-$logtxt"
+Log in $logstash"
 
 	if [ $instret != 0 ]; then
 	    # Install failed, files changed.  We clean up.

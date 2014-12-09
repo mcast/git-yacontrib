@@ -109,7 +109,7 @@ ll_create_empty() {
 }
 
 ll_create_done() {
-    echo "# You might want something here..." > .gitignore
+    printf "\n# You might want something here...\n\n# Builds where noting happened\nbuildlogs/*~no-op~\n\n" > .gitignore
     git add $verb_v -A . && \
 	git commit $verb_q -m "init complete" && \
 	git config --unset git-ll.incomplete
