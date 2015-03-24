@@ -14,8 +14,10 @@ git-k
 git-ll-cpanm
 git-ll-init
 git-log1
+git-logG
 git-permsfix-shared-clone
 git-qcommit
+git-qpull
 git-rebase-topswap
 git-rehash
 git-st

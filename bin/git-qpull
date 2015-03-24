@@ -1,0 +1,19 @@
+#! /bin/sh
+
+SUBDIRECTORY_OK=1
+USAGE="[...options for git-oull]"
+LONG_USAGE='"Quiet oull" for auto-oull scripts, calls "git pull ..." and
+filters out the nothing-happened-noise.
+
+This command merges STDERR into STDOUT.
+'
+
+. "$(git --exec-path)/git-sh-setup"
+
+if TXT="$( git pull "$@" )"; then
+    [ "$TXT" = "Already up-to-date." ] || echo "$TXT"
+else
+    ERR=$?
+    echo "$TXT"
+    exit $ERR
+fi
