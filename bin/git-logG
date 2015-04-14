@@ -1,0 +1,6 @@
+#! /bin/sh
+
+FMT=--format='format:%x09%h %C(dim white)%aE%Creset %s%d%Creset'
+FMT=--oneline
+
+exec git log $FMT --graph --decorate --full-history --date-order --all "$@"
