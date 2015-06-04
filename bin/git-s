@@ -1,0 +1,7 @@
+#! /bin/sh
+
+# Equivalent to
+#
+#   git config --global alias.st status ...
+
+exec git -c color.status=1 status --ignored --short --branch -u "$@"

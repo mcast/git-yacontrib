@@ -20,6 +20,7 @@ git-qcommit
 git-qpull
 git-rebase-topswap
 git-rehash
+git-s
 git-st
 git-undzil
 git-up
