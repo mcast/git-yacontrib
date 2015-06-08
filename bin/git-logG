@@ -1,6 +1,11 @@
 #! /bin/sh
 
-FMT=--format='format:%x09%h %C(dim white)%aE%Creset %s%d%Creset'
-FMT=--oneline
+#FMT=--format='format:%x09%h %C(dim white)%aE%Creset %s%d%Creset'
 
-exec git log $FMT --graph --decorate --full-history --date-order --all "$@"
+FMT=--oneline
+# has nice colouring which I prefer to keep
+
+# from https://github.com/rjbs/rjbs-dots/blob/master/bin/git-hist-squisher
+#FMT=--pretty='[%C(cyan)%h%Creset]%C(bold cyan)%d%Creset %s'
+
+exec git log "$FMT" --graph --decorate --full-history --date-order --all --color "$@"
