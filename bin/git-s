@@ -4,4 +4,4 @@
 #
 #   git config --global alias.st status ...
 
-exec git -c color.status=1 status --ignored --short --branch -u "$@"
+exec git -c color.status=1 -c color.status.untracked=yellow status --ignored --short --branch -u "$@"
