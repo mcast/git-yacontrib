@@ -32,7 +32,14 @@ showfile() {
         die "File $(showfn "$fn"): not a file
 $dbg"
     }
-    find "$fn" -printf "%TY-%Tm-%Tdt%TT%Tz %-10u "
+    if [ "$OSTYPE" = "darwin13" ]; then
+	# XXX: covers this Mac OS X 10.9 thing, but should be more general
+	# hopefully BSD stat; chomp the LF
+	printf "%s" "$( stat -t '%Ft%T%z' -f "%Sm %-10Su " "$fn" )"
+    else
+	# hopefully gnufind
+	find "$fn" -printf "%TY-%Tm-%Tdt%TT%Tz %-10u "
+    fi
     showfn "$fn"
     printf "\n"
 }
@@ -40,7 +47,7 @@ $dbg"
 user2author() {
     local usr auth me_name me_mail
     usr="$1"
-    if [ "$( echo "$usr" | wc -l )" != 1 ]; then
+    if [ $( echo "$usr" | wc -l ) != 1 ]; then
         # $usr is multi-line
         die Cannot map multiple local users \($usr\) to one author
     elif git config --get "user2author.$usr"; then
