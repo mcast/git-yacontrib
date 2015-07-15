@@ -1,0 +1,7 @@
+#! /bin/sh
+
+if [ $# = 0 ]; then
+    exec git branch -avv --color=auto
+else
+    exec git branch "$@"
+fi
