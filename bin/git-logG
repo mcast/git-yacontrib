@@ -8,4 +8,4 @@ FMT=--oneline
 # from https://github.com/rjbs/rjbs-dots/blob/master/bin/git-hist-squisher
 #FMT=--pretty='[%C(cyan)%h%Creset]%C(bold cyan)%d%Creset %s'
 
-exec git log "$FMT" --graph --decorate --full-history --date-order --all --color "$@"
+exec git log "$FMT" --graph --decorate --full-history --date-order --all --color=auto "$@"
