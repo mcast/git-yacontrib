@@ -31,16 +31,23 @@ Show help
 
 Show manpage
 
-=item -n | --name <name>
+=item --name | -n <name>
 
 Set the name to show.  Default is your name.
+
+=item --quiet | -q <n>
+
+Set limit on number of email addresses expected.  When within this
+limit, print nothing and return zero.  Otherwise print the report and
+return exit code 4.
 
 =cut
 
 sub main {
-  my ($findname, $help, $man);
+  my ($findname, $help, $man, $quietlim);
   GetOptions('name|n=s' => \$findname,
              'help' => \$man,
+             'quiet|q=i', \$quietlim, # TODO: take default from a git-config var, to set once and update manually
              'h' => \$help)
     or pod2usage(-verbose => 0);
   pod2usage(-verbose => 1) if $help;
@@ -67,6 +74,7 @@ sub main {
   open my $in, '-|', @cmd
     or die "fork(@cmd) failed: $!";
 
+  my ($ut0, $ut1);
   my %addr; # email => { earlytime, earlyhash, earlytype, latetime, latehash, latetype, count }
   while (my $ln = <$in>) {
     chomp $ln;
@@ -101,17 +109,29 @@ sub main {
       $E->{type} .= $type unless $E->{type} =~ /$type/;
       $E->{type} = 'ac' if $E->{type} eq 'ca';
     }
+
+    $ut0 = $utime if !defined $ut0 || $utime < $ut0;
+    $ut1 = $utime if !defined $ut1 || $utime > $ut1;
   }
 
-  print "$findname:\n";
+  return 0 if defined $quietlim && $quietlim >= keys %addr;
+
+  my $W = 132;
+  my @WT = ($W, $ut0, $ut1);
+  print "\n$findname:\n\n";
   my @email_by_freq = sort {( $addr{$b}{count} <=> $addr{$a}{count} ||
                               $addr{$a}{earlytime} <=> $addr{$b}{earlytime} )}
     keys %addr;
   foreach my $email (@email_by_freq) {
     my $E = $addr{$email};
-    my ($et, $lt) = map { iso8601($_) }      ($E->{earlytime}, $E->{latetime});
-    my ($eh, $lh) = map { substr($_, 0, 7) } ($E->{earlyhash}, $E->{latehash});
+    my ($et, $lt) = map { iso8601($_) }       ($E->{earlytime}, $E->{latetime});
+    my ($L, $R)   = map { widthpos(@WT, $_) } ($E->{earlytime}, $E->{latetime});
+    my ($eh, $lh) = map { substr($_, 0, 7) }  ($E->{earlyhash}, $E->{latehash});
     my $type = join $E->{type}, qw{ ( ) };
+
+    print edges($L, $R, ',', '.');
+    # TODO: ASCII sparkline instead?  All commits marked, edges emphasised
+
     if ($E->{earlyhash} eq $E->{latehash}) {
       printf("%5dx %19s %7s   %s/%s %4s : %s\n",
              $E->{count}, '', '',  $lt, $lh, $type, $email);
@@ -119,9 +139,21 @@ sub main {
       printf("%5dx %19s/%7s - %s/%s %4s : %s\n",
              $E->{count}, $et, $eh, $lt, $lh, $type, $email);
     }
+    print edges($L, $R, qw( ` ' ));
   }
 
+  return 4 if defined $quietlim;
   return 0;
+}
+
+sub widthpos {
+  my ($W, $tl, $tr, $t) = @_;
+  return int(0.5 + $W * ($t - $tl) / ($tr - $tl));
+}
+
+sub edges {
+  my ($l, $r, $ml, $mr) = @_;
+  return join '', ' ' x ($l - 1), $ml, '-' x ($r - $l), $mr, "\n";
 }
 
 sub iso8601 {
