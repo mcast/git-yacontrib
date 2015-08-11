@@ -25,3 +25,4 @@ git-s
 git-st
 git-undzil
 git-up
+git-which-me
