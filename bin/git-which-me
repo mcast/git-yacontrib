@@ -184,12 +184,33 @@ sub iso8601 {
 
 sub do_install {
   my ($args) = @_;
-  my $sh_txt = qq{#! /bin/sh\n# Installed by git which-me --install\ngit which-me $args\n};
+  my $sh_txt = qq{#! /bin/sh\n# Installed by git which-me --install\n$0 $args\n};
   my $hookdir = ".git/hooks";
-  die "Hook directory $hookdir: not a directory" unless -d $hookdir;
   my @hookfile = map {"$hookdir/$_"} qw( pre-commit pre-push );
-  my @old = grep { -f $_ && -x _ } @hookfile;
-  die "Old hook file(s) installed already: @old" if @old;
+
+  # Check old contents
+  die "Hook directory $hookdir: not a directory" unless -d $hookdir;
+  my @unknown_old;
+  foreach my $oldfn (@hookfile) {
+    next unless -f $oldfn && -x _;
+    open my $fh, '<', $oldfn or die "Open old $oldfn to read: $!";
+    my $old_txt = do { local $/; <$fh> };
+    my $old_sh = $old_txt;
+    $old_sh =~ s{^#!\s*/bin/sh\n}{};
+    $old_sh =~ s{^\s*(#.*)?\n}{}mg;
+    chomp $old_sh;
+    if ($old_txt eq $sh_txt) {
+      warn "Unchanged $oldfn\n";
+    } elsif ($old_sh =~ m{^(\Q$0\E|git which-me).*$}) {
+      warn "Updating old $oldfn: was $old_sh\n";
+    } else {
+      warn qq{Old $oldfn = """$old_sh"""};
+      push @unknown_old, $oldfn;
+    }
+  }
+  die "Old hook file(s) installed already: @unknown_old" if @unknown_old;
+
+  # Write new contents
   foreach my $hookfile (@hookfile) {
     if (-e $hookfile) {
       rename $hookfile, "$hookfile.old"
@@ -200,6 +221,7 @@ sub do_install {
     close $fh or die "Closing $hookfile: $!";
     chmod 0755, $hookfile or die "chmod 0755 $hookfile: $!";
   }
+
   return 0;
 }
 
