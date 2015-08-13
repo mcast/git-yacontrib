@@ -41,12 +41,28 @@ Set limit on number of email addresses expected.  When within this
 limit, print nothing and return zero.  Otherwise print the report and
 return exit code 4.
 
+=item --install "<args>*"
+
+Install a script containing C<< git which-me <args>* >> into the
+pre-commit and pre-push hooks for the current repository, if that can
+be done without touching existing hooks; or error.
+
+Note that in pre-commit, the new commit is not yet visible, so you
+would find the subsequent commit blocked.
+
+Post-commit is not used because it's too late to make an error, and
+some GUI tools (rowanj GitX-dev 0.15.1964) don't display the
+post-commit text.
+
+TODO: This option is "temporary" in the sense that it's the Wrong Place to put hook management tools.
+
 =cut
 
 sub main {
-  my ($findname, $help, $man, $quietlim);
+  my ($findname, $help, $man, $quietlim, $install);
   GetOptions('name|n=s' => \$findname,
              'help' => \$man,
+             'install|I=s' => \$install,
              'quiet|q=i', \$quietlim, # TODO: take default from a git-config var, to set once and update manually
              'h' => \$help)
     or pod2usage(-verbose => 0);
@@ -60,6 +76,8 @@ sub main {
     chdir $cdup
       or die "chdir $cdup: $!";
   }
+
+  return do_install($install) if defined $install;
 
   if (!defined $findname) {
     my $ident = qx{ git var GIT_AUTHOR_IDENT };
@@ -161,6 +179,28 @@ sub iso8601 {
   my @t = localtime($ut);
   return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
                  $t[5] + 1900, $t[4] + 1, @t[3,2,1,0]);
+}
+
+
+sub do_install {
+  my ($args) = @_;
+  my $sh_txt = qq{#! /bin/sh\n# Installed by git which-me --install\ngit which-me $args\n};
+  my $hookdir = ".git/hooks";
+  die "Hook directory $hookdir: not a directory" unless -d $hookdir;
+  my @hookfile = map {"$hookdir/$_"} qw( pre-commit pre-push );
+  my @old = grep { -f $_ && -x _ } @hookfile;
+  die "Old hook file(s) installed already: @old" if @old;
+  foreach my $hookfile (@hookfile) {
+    if (-e $hookfile) {
+      rename $hookfile, "$hookfile.old"
+        or die "Failed to move $hookfile -> $hookfile.old: $!";
+    }
+    open my $fh, '>', $hookfile or die "Create $hookfile: $!";
+    print {$fh} $sh_txt or die "Write $hookfile: $!";
+    close $fh or die "Closing $hookfile: $!";
+    chmod 0755, $hookfile or die "chmod 0755 $hookfile: $!";
+  }
+  return 0;
 }
 
 
