@@ -65,6 +65,11 @@ of
 
 =item * all stashes in the reflog
 
+Note that stashes recorded in the reflog
+L<are not expired, since v1.5.6.6|https://github.com/git/git/commit/60bce2bb8b3cd5ca56f8156cbca16abee151d817>
+but they aren't going to leave the local repository by an ordinary
+push or fetch.
+
 =item * other extant commitids from reflogs
 
 This would allow recovery of not-yet-garbage-collected commits, from
