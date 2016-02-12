@@ -9,25 +9,25 @@ my path.  Some could be in C<~/.gitconfig section [alias]>.
 
 =item git br
 
-C<git branch <args>>, or list branches
+C<< git branch <args> >>, or list branches
 
 =item git ci
 
-C<git commit <args>
+C<< git commit <args> >>
 
 =item git ci^
 
-C<git commit --amend -CHEAD <args>
+C<< git commit --amend -CHEAD <args> >>
 
 Also works with C<-e> flag to edit the message.
 
 =item git co
 
-C<git checkout <args>>
+C<< git checkout <args> >>
 
 =item git ff
 
-C<git merge --ff-only <args>>
+C<< git merge --ff-only <args> >>
 
 =item git g
 
@@ -39,8 +39,8 @@ Basically C<gitk --all HEAD &>
 
 =item git gk [ <workdir> ]
 
-C<git g; git k>, optionally preceded by C<cd <workdir>>.  This is the
-main tool I use when starting work in a project.
+C<git g; git k>, optionally preceded by C<< cd <workdir> >>.  This is
+the main tool I use when starting work in a project.
 
 =item git iec
 
@@ -49,11 +49,11 @@ after C<git init foo; cd foo>.
 
 =item git s
 
-C<git status (...color...) --ignored --short --branch -u <args>>
+C<< git status (...color...) --ignored --short --branch -u <args> >>
 
 =item git st
 
-C<git status <args>>
+C<< git status <args> >>
 
 =back
 
@@ -63,7 +63,7 @@ C<git status <args>>
 
 =item git-P
 
-C<git --no-pager <args>>
+C<< git --no-pager <args> >>
 
 =item git commit-retro
 
@@ -97,7 +97,7 @@ Scary command!  Only installs with C<./install.sh -yS ...>
 
 =item git up
 
-C<git pull --rebase <args>>
+C<< git pull --rebase <args> >>
 
 For those who use the linearised history, first-push-wins model.
 
