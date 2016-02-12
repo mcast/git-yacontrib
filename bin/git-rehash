@@ -14,6 +14,7 @@ git-rehash - generate input for "${foo}sum -c"
  git-rehash -d sha512_hex -c master~3 > files.sha512
  sha512sum -c files.sha512
 
+
 =head1 DESCRIPTION
 
 This tool emits on STDOUT the cryptographic digests of the files in
@@ -31,6 +32,7 @@ selected, and their apparent filename.
 Further options may be passed to C<git ls-tree> if they are all
 preceeded with C<-->, so C<-- --full-tree HEAD> is equivalent to
 C<cd>ing up to the top of the repository before running.
+
 
 =head1 OPTIONS
 
@@ -72,6 +74,12 @@ The option set C< -G -d sha1_hex > allows comparison of the
 recalculation with the native id values.
 
 =back
+
+
+=head1 SEE ALSO
+
+L<https://github.com/mcast/git-stronghash> for something more
+automated and integrated.
 
 =head1 AUTHOR
 
