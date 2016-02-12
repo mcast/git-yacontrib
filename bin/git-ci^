@@ -1,0 +1,10 @@
+#! /bin/sh
+
+# Calling this as "git ci^" produces the warning
+#
+#   error: invalid key: pager.ci^
+#
+# before proceeding, under "git version 2.2.1" but not under "git
+# version 1.8.5.2 (Apple Git-48)"
+
+exec git commit --amend -CHEAD "$@"

@@ -15,6 +15,12 @@ C<git branch <args>>, or list branches
 
 C<git commit <args>
 
+=item git ci^
+
+C<git commit --amend -CHEAD <args>
+
+Also works with C<-e> flag to edit the message.
+
 =item git co
 
 C<git checkout <args>>

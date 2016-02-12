@@ -1,6 +1,7 @@
 git-P
 git-br
 git-ci
+git-ci^
 git-co
 git-commit-retro
 git-compilation-annotate
