@@ -1,8 +1,160 @@
 =head1 DESCRIPTION
 
-These are the sort of small Git extension scripts I would keep in
-C<~/bin/> and have on my path, or put in C<~/.gitconfig section
-[alias]>.  The project is named "mca-wtsi/git-yacontrib".
+These are small Git extension scripts I keep in C<~/bin/> and have on
+my path.  Some could be in C<~/.gitconfig section [alias]>.
+
+=head2 The short and obvious commands
+
+=over 4
+
+=item git br
+
+C<git branch <args>>, or list branches
+
+=item git ci
+
+C<git commit <args>
+
+=item git co
+
+C<git checkout <args>>
+
+=item git ff
+
+C<git merge --ff-only <args>>
+
+=item git g
+
+C<git gui &>
+
+=item git k
+
+Basically C<gitk --all HEAD &>
+
+=item git gk [ <workdir> ]
+
+C<git g; git k>, optionally preceded by C<cd <workdir>>.  This is the
+main tool I use when starting work in a project.
+
+=item git iec
+
+Create standard "initial empty commit".  This is the first thing I run
+after C<git init foo; cd foo>.
+
+=item git s
+
+C<git status (...color...) --ignored --short --branch -u <args>>
+
+=item git st
+
+C<git status <args>>
+
+=back
+
+=head2 Longer or more complex commands
+
+=over 4
+
+=item git-P
+
+C<git --no-pager <args>>
+
+=item git commit-retro
+
+Commit, making (Author, AuthorDate) from file stat.  Requires some
+config to deal with other users.
+
+=item git ireb
+
+C<git rebase -i --autosquash> ...of whatever is not pushed
+
+=item git log1
+
+Details of last commit.
+
+=item git logG
+
+Textual graph of commits.
+
+=item git rebase-topswap
+
+Swap C<HEAD> and C<HEAD^> using C<git rebase -i>.
+
+=item git rhH
+
+=item git rhH ^
+
+C<git reset --hard HEAD>,
+C<git reset --hard HEAD^>
+
+Scary command!  Only installs with C<./install.sh -yS ...>
+
+=item git up
+
+C<git pull --rebase <args>>
+
+For those who use the linearised history, first-push-wins model.
+
+=item git ll-cpanm, git ll-init
+
+Install CPAN (Perl5) libraries, into a L<local::lib> directory under
+Git control.
+
+=back
+
+=head2 Tools for scripts
+
+=over 4
+
+=item git compilation-annotate
+
+ # "show me what's wrong with code written in the last 30 days"
+ perlcritic --quiet --nocolour --verbose "%f:%l:%c:%m\t[%s] %p\n" \
+    modules t/modules | git-compilation-annotate -n 30
+
+=item git head
+
+What's the current branch name, or HEAD commitid?
+
+=item git qcommit
+
+Commit noisily, or keep quiet if nothing to commit
+
+=item git qpull
+
+Pull noisily, or keep quiet if nothing is new
+
+=back
+
+=head2 Tools for hooks
+
+=over 4
+
+=item git rehash
+
+For when SHA1 isn't strong enough.
+
+=item git which-me
+
+Which of my many email addresses am I using here?
+
+=back
+
+=head2 Incomplete or forgotten
+
+Some tools looked like a good idea, or solved part of some transient
+problem, or might be useful when completed.
+
+ git-enumerate-commits
+ git-enumerate-repos
+ git-gc-du
+ git-permsfix
+ git-permsfix-shared-clone
+ git-proxy-squid
+ git-subtree-branch
+ git-undzil
+ mr-unconfigured-search
+
 
 =head1 INSTALLATION
 
@@ -11,14 +163,13 @@ C<~/bin/> and have on my path, or put in C<~/.gitconfig section
 The current plan is to "install" them via symlinks,
   ln -snvf ../../../gitwk-github/scripts/bin/{git-rebase-topswap,pidfzap} ~/bin/
 
-or include the bin/ on PATH.
+You must put that C<~/bin> on C<$PATH> yourself.
 
 Running the supplied script with
 
  ./install -y ~/bin
 
-will do this for you, in the way I currently prefer.  You must put
-that C<~/bin> on C<PATH> yourself.
+will do this for you, in the way I currently prefer.
 
 =head2 The scary scripts
 
@@ -186,7 +337,8 @@ L<App::GitHubPullRequest>
 I have written them in the course of my work for
 http://www.sanger.ac.uk/ and for personal use.
 
-The project is released under GPLv2 or later, per local policy.
+The project "mcast/git-yacontrib" is released under GPLv2 or later,
+per local policy.
 
 (I realise this is far to vague to form a reliable declaration of
 "release under GPLv2" except where explicit but marking for release
