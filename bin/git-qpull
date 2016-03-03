@@ -1,8 +1,8 @@
 #! /bin/sh
 
 SUBDIRECTORY_OK=1
-USAGE="[...options for git-oull]"
-LONG_USAGE='"Quiet oull" for auto-oull scripts, calls "git pull ..." and
+USAGE="[...options for git-pull]"
+LONG_USAGE='"Quiet pull" for auto-pull scripts, calls "git pull ..." and
 filters out the nothing-happened-noise.
 
 This command merges STDERR into STDOUT.
