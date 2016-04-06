@@ -43,7 +43,8 @@ else
 	{
 	    {
 		{
-		    CDPATH= cd $DIR && $COMMAND "$@"
+		    CDPATH= cd $DIR && $COMMAND "$@" || \
+			echo "exit code $?" >&2
 		}  | prfx "$LINE" >&3
 	    } 2>&1 | prfx "$LINE" >&2
 	} 3>&1

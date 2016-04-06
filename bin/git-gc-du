@@ -5,8 +5,8 @@
 #
 # Probably requires the GNU du
 
-DULIM="$( git config --get gc.du )"
-DULIM=${1:-${DULIM:-200}}
+set -e
+DULIM="$( git config --get gc.du || echo 200 )"
 
 if [ "$1" = '-h' ]; then
     printf 'Syntax: %s [ <mebibytes> ]\n
@@ -25,7 +25,7 @@ dumegs() {
 
 DUOBJ="$( dumegs --exclude .git/objects/pack .git/objects )"
 
-if [ $DUOBJ -gt $DULIM ]; then
+if [ "$DUOBJ" -gt "$DULIM" ]; then
     echo ": Objects using $DUOBJ MiB, exceeds limit $DULIM"
     git gc
     echo ": Packs now use $( dumegs .git/objects/pack ) MiB, remaining objects $( dumegs --exclude .git/objects/pack .git/objects ) MiB"
