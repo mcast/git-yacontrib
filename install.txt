@@ -5,7 +5,10 @@ git-ci^
 git-co
 git-commit-retro
 git-compilation-annotate
+git-enumerate-commits
+git-enumerate-repos
 git-ff
+git-for-each-repo
 git-g
 git-gc-du
 git-gk

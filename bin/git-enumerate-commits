@@ -2,40 +2,30 @@
 
 showhelp() {
     cat <<HELP >&2
-Usage: $0 <dir>*
+Usage: $0
 
-For each directory (defaulting to current directory), list git
-commit-ids reachable from all references.
+List git commit-ids reachable from all references.
+
+For multiple repositories, use
+  git enumerate-repos ~ | git for-each-repo   git enumerate-commits
 
 HELP
     exit 1
 }
 
-# Would benefit from a flag to avoid printing directories that other users don't have access to...
-
 
 # Digest args
-if [[ $# == 0 ]]; then
-    DIRS=.
-elif [ "$1" == "--help" ]; then
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     showhelp
-else
-    DIRS=$*
 fi
 
-
-for DIR in $DIRS; do
-    if cd $DIR; then
-	INFO=`git for-each-ref --count 1 2>&1`
-	OK=$?
-	if [[ $OK != 0 ]]; then
-	    echo "$0: skipping $DIR because ''$INFO''" >&2
-	elif [ -z "$INFO" ]; then
-	    echo -e "$DIR\t(no refs)"
-	else
-	    (git log --date-order --pretty=tformat:%H%x09%ai --all \
-		|| echo -e "[w] $0: problem with $DIR\n---------------" >&2 ) | \
-		perl -ne 'BEGIN { $dir=shift } print "$dir\t$_"' $DIR
-	fi
-    fi
-done
+INFO=`git for-each-ref --count 1 2>&1`
+OK=$?
+if [ $OK -ne 0 ]; then
+    echo "$0: skip because ''$INFO''" >&2
+elif [ -z "$INFO" ]; then
+    echo "(no refs)"
+else
+    git log --date-order --pretty=tformat:%H%x09%ai --all \
+	|| echo -e "$0: error ($?) from git-log" >&2
+fi
