@@ -23,6 +23,40 @@ the C<PROJ.git>).
 Looks for directories containing both C<objects/> and C<refs/> or
 C<packed-refs>.
 
+=head2 Output
+
+Git directories are printed one per line, once and in the first form
+they are found under the <dir> from which they were scanned, e.g.
+
+ /home/me/gitwk-pub/superfoo/.git
+ /home/me/_bares/my-bare-git.git
+
+Warnings go to stderr.
+
+=head2 Symlinks and duplicates
+
+Git directories are also stored for the duration of the scan under an
+absolute (symlink-free) path, and will not be repeated.
+
+This allows clones in twisty mazes of symlinks to be printed in your
+preferred order, by scanning the symlinked directories first, e.g.
+
+  /home/me/gitwk-priv -> /home/me/.ENCRYPTED/gitwk-priv/
+  /home/me/gitwk-pub/
+  /home/me/.ENCRYPTED/gitwk-priv/proj/
+
+may be scanned with C<git enumerate-repos ~/gitwk* ~> to output
+C</home/me/gitwk-priv/proj/.git> in preference to (the same directory
+seen as) C</home/me/.SECURE/gitwk-priv/proj/.git> .
+
+Symlinks are not scanned, so there is no possibility of looping
+traversal.
+
+=head2 Stored state
+
+This program currently uses no externally stored state or
+configuration.
+
 
 =head1 CAVEATS
 
@@ -55,7 +89,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 sub main {
     local $SIG{__WARN__} = sub { warn "Warning: @_" }; # decorate the warnings from find
-
     my $T = Local::Trundle->new;
     $T->dirs_add(@ARGV);
     $T->run;
@@ -68,11 +101,13 @@ exit main();
 package Local::Trundle;
 use strict;
 use warnings;
+use Cwd 'abs_path';
 
 sub new {
   my ($class) = @_;
   my $self =
     { dirstack => [],
+      seen => {}, # key=abs(dir), value=undef
       max_stack => 20_000, # arbitrary but large-ish
     };
   bless $self, $class;
@@ -129,7 +164,7 @@ sub dir_scan {
 	    next;
 	}
 	if (-l _) {
-#	    warn "$fn: ignored symlink\n";
+	    warn "$fn: ignored dir-symlink\n" if -d $fn;
 	} elsif (-f _) {
 	    $gitish{$leaf} = 1 if $leaf eq 'packed-refs';
 	} elsif (-d _) {
@@ -144,14 +179,26 @@ sub dir_scan {
     while (my ($k, $v) = each %gitish) { $bitf |= $v }
 
     if ($bitf == 3) {
-	# found one
-	print "$dir\n";
+        $self->found($dir);
+	# no recursion inside .git/
     } else {
-	# else recurse
         $self->dirs_add(@subdir);
     }
 
     return 1;
+}
+
+sub found {
+  my ($self, $dir) = @_;
+  my $abs = abs_path($dir);
+  my $seens = $self->{seen};
+  if (exists $seens->{$abs}) {
+    warn "(skip seen) $dir\n";
+  } else {
+    print "$dir\n";
+    $self->{seen}{$abs} = undef;
+  }
+  return;
 }
 
 1;
