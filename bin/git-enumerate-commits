@@ -2,7 +2,7 @@
 
 showhelp() {
     cat <<HELP >&2
-Usage: $0 <dir>*
+Usage: $0 <git-dir>*
 
 For each directory (defaulting to current directory), list git
 commit-ids reachable from all references.
@@ -11,13 +11,13 @@ HELP
     exit 1
 }
 
-# Would benefit from a flag to avoid printing directories that other users don't have access to...
+# TODO: flag to omit directories that other users don't have access to...
 
 
 # Digest args
-if [[ $# == 0 ]]; then
+if [ $# -eq 0 ]; then
     DIRS=.
-elif [ "$1" == "--help" ]; then
+elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     showhelp
 else
     DIRS=$*
@@ -28,7 +28,7 @@ for DIR in $DIRS; do
     if cd $DIR; then
 	INFO=`git for-each-ref --count 1 2>&1`
 	OK=$?
-	if [[ $OK != 0 ]]; then
+	if [ $OK -ne 0 ]; then
 	    echo "$0: skipping $DIR because ''$INFO''" >&2
 	elif [ -z "$INFO" ]; then
 	    echo -e "$DIR\t(no refs)"
