@@ -1,0 +1,49 @@
+#! /bin/sh
+
+showhelp() {
+    cat <<HELP >&2
+Usage: git enumerate-repos ~ | $0 <command> <args>*
+
+For each Git repository, run the given command inside.
+
+  Clones with work trees are expected in the form foo/bar/.git
+  Bare repositories are expected in the form foo/bar.git
+
+Output from each invocation of the command is prefixed with the
+directory in which it runs, and a TAB character, and then passed
+through on the same output stream.
+
+TODO: flags for other output formats could be useful
+
+HELP
+    exit 1
+}
+
+prfx() {
+    perl -ne 'BEGIN { $prfx = shift } print "$prfx\t$_"' "$1"
+}
+
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    showhelp
+else
+    COMMAND="$1"
+    shift
+    while read -r LINE; do
+	case "$LINE" in
+	    */.git | */.git/) DIR="$( dirname "$LINE" )" ;;
+	    *.git)            DIR="$LINE" ;;
+	    *)
+		echo "Skip unexpected Git-name '$LINE'" >&2
+		continue
+		;;
+	esac
+
+	{
+	    {
+		{
+		    CDPATH= cd $DIR && $COMMAND "$@"
+		}  | prfx "$LINE" >&3
+	    } 2>&1 | prfx "$LINE" >&2
+	} 3>&1
+    done
+fi
