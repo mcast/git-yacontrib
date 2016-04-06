@@ -32,7 +32,7 @@ a similar set of rules and a limit on recursion depth.
 
 =head1 AUTHOR
 
- Copyright (c) 2009 Genome Research Ltd.
+ Copyright (c) 2009,2016 Genome Research Ltd.
  Author: Matthew Astley <mca@sanger.ac.uk>
 
 This file is part of "git-yacontrib".
@@ -56,24 +56,55 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 sub main {
     local $SIG{__WARN__} = sub { warn "Warning: @_" }; # decorate the warnings from find
 
-    dirs_add(@ARGV);
-    while (dir_scan()) {}
+    my $T = Local::Trundle->new;
+    $T->dirs_add(@ARGV);
+    $T->run;
+    return 0;
 }
 
-{
-    my @dirstack;
+exit main();
 
-    sub dirs_add {
-	push @dirstack, @_;
-    }
 
-    sub dirs_next {
-	return @dirstack ? shift @dirstack : undef;
-    }
+package Local::Trundle;
+use strict;
+use warnings;
+
+sub new {
+  my ($class) = @_;
+  my $self =
+    { dirstack => [],
+      max_stack => 20_000, # arbitrary but large-ish
+    };
+  bless $self, $class;
+  return $self;
+}
+
+sub run {
+  my ($self) = @_;
+  while ($self->dir_scan) {}
+  return;
+}
+
+sub dirs_add {
+  my $self = shift;
+  my $S = $self->{dirstack};
+  push @$S, @_;
+  my $stacksize = @$S;
+  die "Abort scan, directory stack reached $stacksize"
+    if $stacksize > $self->{max_stack};
+  return;
+}
+
+sub dirs_next {
+  my ($self) = @_;
+  my $S = $self->{dirstack};
+  return @$S ? shift @$S : undef;
 }
 
 sub dir_scan {
-    my $dir = dirs_next();
+    my ($self) = @_;
+    my $max_stack = $self->{max_stack};
+    my $dir = $self->dirs_next;
     return 0 unless defined $dir;
 
     my @leaf;
@@ -117,10 +148,10 @@ sub dir_scan {
 	print "$dir\n";
     } else {
 	# else recurse
-	dirs_add(@subdir);
+        $self->dirs_add(@subdir);
     }
 
     return 1;
 }
 
-main();
+1;
