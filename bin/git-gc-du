@@ -1,15 +1,15 @@
-#! /bin/sh
+#! /bin/bash
 
 # A variant on "git gc --auto", which goes by object count (and I have
 # found this ineffective in Precise 1.7.0.4)
 #
 # Probably requires the GNU du
 
-set -e
+set -e -o pipefail
 DULIM="$( git config --get gc.du || echo 200 )"
 
 if [ "$1" = '-h' ]; then
-    printf 'Syntax: %s [ <mebibytes> ]\n
+    printf 'Syntax: %s [ -v ] [ <mebibytes> ]\n
 Run git-gc if objects currently use more than limit.\n
 Default limit is taken from
   git config gc.du <mebibytes>
@@ -18,15 +18,29 @@ or otherwise defaults to 200.\n\n' "$(basename "$0" )" >&2
     exit 1
 fi
 
+verbose=
+if [ "$1" = '-v' ]; then
+    verbose=1
+    shift
+fi
+
+if [ -n "$1" ]; then
+    DULIM="$1"
+fi
 
 dumegs() {
     du -sm "$@" | cut -f1
 }
 
-DUOBJ="$( dumegs --exclude .git/objects/pack .git/objects )"
+gitdir="$( git rev-parse --git-dir )"
+DUOBJ="$( dumegs --exclude "$gitdir"/objects/pack "$gitdir"/objects )"
 
 if [ "$DUOBJ" -gt "$DULIM" ]; then
     echo ": Objects using $DUOBJ MiB, exceeds limit $DULIM"
     git gc
-    echo ": Packs now use $( dumegs .git/objects/pack ) MiB, remaining objects $( dumegs --exclude .git/objects/pack .git/objects ) MiB"
+    echo ": Packs now use $( dumegs "$gitdir"/objects/pack ) MiB, remaining objects $( dumegs --exclude "$gitdir"/objects/pack "$gitdir"/objects ) MiB"
+else
+    if [ -n "$verbose" ]; then
+	echo ": Objects use $DUOBJ MiB"
+    fi
 fi
