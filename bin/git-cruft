@@ -1,0 +1,44 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+##### things to list, in priority order
+#
+### sync state, wrt. each remote
+#
+# tags not yet pushed (NET:READ)
+# tags not matching pushed state (NET:READ)
+# >> list all refs (tags, branches, stashes), to be diffed later after refetch
+#
+# branches not yet pushed (no remote)
+# branches not pushed up-to-date (ahead of/behind remote)
+#
+# local branches lagging their remote (NET:READ)
+#
+### local things pointing at the checkout (some heuristics, not the Halting Problem)
+#
+# git config --get-regexp ^plumbed-in\\.  # like our ./install.sh
+# PATH or other %ENV elements
+# crontab
+# dotfiles (directly under ~/ or maybe one dir down)
+# profile / login
+# ~/public_html/
+#
+### local state
+#
+# git-notes(1), refs/notes/*  https://git-scm.com/blog/2010/08/25/notes.html
+# git-replace(1), refs/replace/
+# stashes
+#
+# staged
+# modified
+# untracked
+# ignored
+#
+# non-standard permissions (anything that looks like it is not the result of a "git checkout")
+# differences in .git/
+#   config
+#   info/grafts
+#
+# some flag to show it should be encrypted, vs. not being under encfs or /dev/mapper/luks-*
