@@ -15,6 +15,11 @@ do_inst() {
     for leaf in $( cat "$src/$instand" ); do
 	ln -snv ",git-yacontrib/$leaf" "$dest"
     done
+
+    {
+	set -x
+	git config plumbed-in.instdir "$dest"
+    }
 }
 
 show_skipped() {
@@ -24,6 +29,12 @@ show_skipped() {
 	<( LC_ALL=C sort "$src"/install*.txt ) \
 	<( find bin -type f -printf "%f\n" | LC_ALL=C sort )
 }
+
+if [ $# = 0 ] && plumbdir="$( git config --get plumbed-in.instdir )"; then
+    # Shortcut
+    echo "Spotted config 'plumbed-in.instdir: $plumbdir'"
+    exec $0 -y "$plumbdir"
+fi
 
 case "$1" in
     -y) do_inst "$2" install.txt ;;
