@@ -118,6 +118,25 @@ Git control.
  perlcritic --quiet --nocolour --verbose "%f:%l:%c:%m\t[%s] %p\n" \
     modules t/modules | git-compilation-annotate -n 30
 
+=item git enumerate-commits
+
+List all commits in the repository, e.g.
+
+ git-enumerate-repos | git for-each-repo  git enumerate-commits > ci-dump
+
+=item git enumerate-repos
+
+Search a directory tree for bare or checkout Git repositories.
+
+=item git for-each-repo
+
+Run a command in each of the enumerated repositories.
+
+=item git gc-du
+
+L<git gc(1)> gated by L<du(1)> of non-packed objects, for
+auto-cleanup.
+
 =item git head
 
 What's the current branch name, or HEAD commitid?
@@ -151,9 +170,6 @@ Which of my many email addresses am I using here?
 Some tools looked like a good idea, or solved part of some transient
 problem, or might be useful when completed.
 
- git-enumerate-commits
- git-enumerate-repos
- git-gc-du
  git-permsfix
  git-permsfix-shared-clone
  git-proxy-squid
