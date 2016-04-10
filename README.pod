@@ -159,6 +159,8 @@ Pull noisily, or keep quiet if nothing is new
 
 For when SHA1 isn't strong enough.
 
+See also L<https://github.com/mcast/git-stronghash> .
+
 =item git which-me
 
 Which of my many email addresses am I using here?
@@ -340,9 +342,9 @@ repos.
 
 =over 4
 
-=item https://metacpan.org/module/App::IsGitSynced
+=item L<https://metacpan.org/module/App::IsGitSynced>
 
-=item https://github.com/aspiers/git-config
+=item L<https://github.com/aspiers/git-config>
 
 =item Github tools
 
