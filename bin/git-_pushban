@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+=head1 NAME
+
+git _pushban - a pre-push hook filter
+
+=head1 DESCRIPTION
+
+Based on F<.git/hooks/pre-push.sample> from Git 1.9.1
+
+=cut
+
+
+sub main {
+  my $passthrough;
+  $passthrough = shift @ARGV if @ARGV && $ARGV[0] eq '-P';
+  my ($remote, $url) = @ARGV;
+  # $remote eq $url means remote was not named
+
+  my @bad;
+  my $z40 = '0' x 40;
+  while (<STDIN>) {
+    chomp;
+
+    # Logic from .git/hooks/pre-push.sample from Git 1.9.1
+    my ($local_ref, $local_sha1, $remote_ref, $remote_sha1)
+      = split / /, $_;
+    my $check_range;
+    if ($local_sha1 eq $z40) {
+      # Branch deletion
+      next;
+    } elsif ($remote_sha1 eq $z40) {
+      # New branch
+      $check_range = $local_sha1;
+    } else {
+      # Update branch
+      $check_range = "$remote_sha1..$local_sha1";
+    }
+    push @bad, qx{ git rev-list -E --grep '!' "$check_range" };
+
+    print if $passthrough;
+  }
+  if (@bad) {
+    chomp @bad;
+    warn "Some commits are blocked from pushing\n";
+    my %shown;
+    my @tell;
+    foreach my $ciid (@bad) {
+      next if $shown{$ciid}++;
+      push @tell, substr($ciid, 0, 8);
+      my $log = qx{ git log -n 1 $ciid };
+      $log =~ s/^/    /mg;
+      warn $log;
+    }
+    die "  >> Push rejected due to @tell\n";
+  }
+  return 0;
+}
+
+# If this script exits with a non-zero status nothing will be pushed.
+exit main();
