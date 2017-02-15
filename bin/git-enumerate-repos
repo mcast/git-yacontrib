@@ -23,6 +23,27 @@ the C<PROJ.git>).
 Looks for directories containing both C<objects/> and C<refs/> or
 C<packed-refs>.
 
+=head2 Options
+
+=over 4
+
+=item --git-dir | -G
+
+List both C<.../worktree/.git> and C<.../bare.git> directories.  This
+is the default.
+
+=item --checkout | -C
+
+List toplevel work trees as C<.../worktree> , omitting trailing
+C</.git> .  Excludes bare repositories unless C<-B> is also set.
+
+=item --bare | -B
+
+List bare repositories as C<.../bare.git> , omitting clones with
+worktrees unless C<-C> is also set.
+
+=back
+
 =head2 Output
 
 Git directories are printed one per line, once and in the first form
@@ -90,6 +111,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 sub main {
     local $SIG{__WARN__} = sub { warn "Warning: @_" }; # decorate the warnings from find
     my $T = Local::Trundle->new;
+    $T->getopt;
     $T->dirs_add(@ARGV);
     $T->run;
     return 0;
@@ -98,20 +120,45 @@ sub main {
 exit main();
 
 
+
 package Local::Trundle;
 use strict;
 use warnings;
 use Cwd 'abs_path';
+use Getopt::Long;
+
 
 sub new {
   my ($class) = @_;
   my $self =
     { dirstack => [],
       seen => {}, # key=abs(dir), value=undef
+      opts => {}, # for ->getopt
       max_stack => 20_000, # arbitrary but large-ish
     };
   bless $self, $class;
   return $self;
+}
+
+sub getopt {
+  my ($self) = @_;
+  my $opts = $self->{opts};
+  GetOptions($opts, qw( bare|B checkout|C gitdir|git-dir|G quiet|q ))
+    or $self->syntax;
+  $opts->{gitdir} = 'default' unless $opts->{bare} || $opts->{checkout};
+  die "--git-dir makes no sense with --bare or --checkout\n"
+    if $opts->{gitdir} && ($opts->{bare} || $opts->{checkout});
+  return;
+}
+
+sub syntax {
+  die "Syntax: git enumerate-repos [ --quiet ] [ --git-dir | --checkout | --bare ] <dirs>*\n\n";
+}
+
+sub noise {
+  my ($self, $fmt, @v) = @_;
+  warn sprintf($fmt, @v) unless $self->{opts}{quiet};
+  return;
 }
 
 sub run {
@@ -164,7 +211,7 @@ sub dir_scan {
 	    next;
 	}
 	if (-l _) {
-	    warn "$fn: ignored dir-symlink\n" if -d $fn;
+	  $self->noise("%s: ignored dir-symlink\n", $fn) if -d $fn;
 	} elsif (-f _) {
 	    $gitish{$leaf} = 1 if $leaf eq 'packed-refs';
 	} elsif (-d _) {
@@ -182,7 +229,7 @@ sub dir_scan {
         $self->found($dir);
 	# no recursion inside .git/
     } else {
-        $self->dirs_add(@subdir);
+        $self->dirs_add(@subdir) if @subdir;
     }
 
     return 1;
@@ -192,13 +239,32 @@ sub found {
   my ($self, $dir) = @_;
   my $abs = abs_path($dir);
   my $seens = $self->{seen};
+  my $opts = $self->{opts};
   if (exists $seens->{$abs}) {
-    warn "(skip seen) $dir\n";
+    $self->noise("(skip seen) %s\n", $dir);
   } else {
-    print "$dir\n";
+    if ($opts->{gitdir}) {
+      print "$dir\n";
+    } else {
+      my $is_bare = $self->is_bare($dir);
+      if ($is_bare) {
+	print "$dir\n" if $opts->{bare};
+      } else {
+	$dir =~ s{/\.git$}{};
+	print "$dir\n" if $opts->{checkout};
+      }
+    }
     $self->{seen}{$abs} = undef;
   }
   return;
+}
+
+sub is_bare {
+  my ($self, $dir) = @_;
+  return 0 if -f "$dir/index"; # ugly, fast, might fib
+  my $bare = qx{ git config -f \Q$dir\E/config core.bare };
+  chomp $bare;
+  return $bare eq 'true' ? 1 : 0;
 }
 
 1;
