@@ -42,6 +42,14 @@ C</.git> .  Excludes bare repositories unless C<-B> is also set.
 List bare repositories as C<.../bare.git> , omitting clones with
 worktrees unless C<-C> is also set.
 
+=item --fingerprint | -F
+
+Use commit-tree fingerprints to identify the discovered repositories.
+The fingerprint name is printed before the path, separated by TAB.
+
+Without further configuration, fingerprints are based on the commitid
+of the root commit (i.e. with zero parents).
+
 =back
 
 =head2 Output
@@ -78,6 +86,46 @@ traversal.
 This program currently uses no externally stored state or
 configuration.
 
+
+=head1 REPOSITORY FINGERPRINT
+
+In order to efficiently identify repositories sharing commits, without
+chasing out the remotes to see where they match, this program attempts
+to fingerprint the commit tree.
+
+Without additional configuration, it takes
+
+=over 4
+
+=item * from the preferred branch (master, develop, devel, dev, or any
+other if they are not found)
+
+=item * the commitid of earliest root commit (ie. with zero parents)
+
+=item * taking the earliest by author date; or for tie-breaking,
+earliest commit date, lowest commitid.
+
+=back
+
+For most repositories this should be enough.  If the master root
+commmit is shared, we will assume the repositories are checkouts of
+the same thing.
+
+TODO: Later, allow configuration of additional marker commitid whose presence will clarify in the case of repositories which have diverged from some common history.
+
+=head2 What can make a repository fingerprint change?
+
+Merging older history into the preferred branch will change the
+fingerprint.  Currently this tool provides no way to configure an
+alternative or override.
+
+L<git-annex(1)> is likely to add new root commits on the C<git-annex>
+branch, and under some circumstances (which I didn't chase) these can
+be earlier than the symlinking branch.  However C<git-annex> will not
+be used as the preferred branch if C<master> etc. are present.
+
+Repositories with no commits have an arbitrary fingerprint of
+C<0000000000000000000000000000000000000000>.
 
 =head1 CAVEATS
 
@@ -126,6 +174,7 @@ use strict;
 use warnings;
 use Cwd 'abs_path';
 use Getopt::Long;
+use YAML 'Dump'; # for debug
 
 
 sub new {
@@ -143,7 +192,7 @@ sub new {
 sub getopt {
   my ($self) = @_;
   my $opts = $self->{opts};
-  GetOptions($opts, qw( bare|B checkout|C gitdir|git-dir|G quiet|q ))
+  GetOptions($opts, qw( bare|B checkout|C gitdir|git-dir|G quiet|q fingerprint|F ))
     or $self->syntax;
   $opts->{gitdir} = 'default' unless $opts->{bare} || $opts->{checkout};
   die "--git-dir makes no sense with --bare or --checkout\n"
@@ -152,7 +201,7 @@ sub getopt {
 }
 
 sub syntax {
-  die "Syntax: git enumerate-repos [ --quiet ] [ --git-dir | --checkout | --bare ] <dirs>*\n\n";
+  die "Syntax: git enumerate-repos [ --quiet ] [ --git-dir | --checkout | --bare ] [ --fingerprint ] <dirs>*\n\n";
 }
 
 sub noise {
@@ -244,18 +293,25 @@ sub found {
     $self->noise("(skip seen) %s\n", $dir);
   } else {
     if ($opts->{gitdir}) {
-      print "$dir\n";
+      $self->show($dir);
     } else {
       my $is_bare = $self->is_bare($dir);
       if ($is_bare) {
-	print "$dir\n" if $opts->{bare};
+	$self->show($dir) if $opts->{bare};
       } else {
 	$dir =~ s{/\.git$}{};
-	print "$dir\n" if $opts->{checkout};
+	$self->show($dir) if $opts->{checkout};
       }
     }
     $self->{seen}{$abs} = undef;
   }
+  return;
+}
+
+sub show {
+  my ($self, $dir) = @_;
+  printf "%s\t", $self->fingerprint($dir) if $self->{opts}{fingerprint};
+  print "$dir\n";
   return;
 }
 
@@ -265,6 +321,68 @@ sub is_bare {
   my $bare = qx{ git config -f \Q$dir\E/config core.bare };
   chomp $bare;
   return $bare eq 'true' ? 1 : 0;
+}
+
+sub fingerprint {
+  my ($self, $dir) = @_;
+  my @pref_branch = qw( master develop devel dev --all );
+  foreach my $branch (@pref_branch) {
+    my $fp = $self->_fingerprint($dir, $branch);
+    return $fp if defined $fp;
+  }
+  # Got no fingerprint.  Could be no commits yet?
+  my $out = $self->_run_there($dir, qw( git branch -a ));
+  if ($out->{ok} && 0 == @{$out->{txt}}) {
+    return '0' x 40; # arbitrary value for "no commits yet"
+  }
+  die join "  ",
+    "Surprised to find no fingerprint in $dir .  Branches are\n",
+      @{$out->{txt}};
+}
+
+sub _fingerprint {
+  my ($self, $dir, $branch) = @_;
+  my $out = $self->_run_there
+    ($dir, qw( git log --max-parents=0 ), '--format=%at %ct %H', $branch);
+  my $txt = $out->{txt}; # ARRAYref
+  if ($out->{ok}) {
+    my @par = map {
+      my @f = m{^(\d+) (\d+) ([a-f0-9]+)\Z}
+	or die "bad fp in $dir: $_";
+      \@f;
+    } @$txt;
+    @par = sort {( $a->[0] <=> $b->[0] ||
+		   $a->[1] <=> $b->[1] ||
+		   $a->[2] cmp $b->[2] )} @par;
+#    warn Dump({ par => \@par, dir => $dir, branch => $branch });
+    die "Somehow no root commits in $branch of $dir" unless @par;
+    return $par[0][2];
+  } else {
+    local $" = "\n  ";
+    #warn "fingerprint branch=$branch in dir=$dir:\n  @$txt\n";
+    return ();
+  }
+}
+
+sub _run_there {
+  my ($self, $dir, @cmd) = @_;
+  my $pid = open my $fh, '-|';
+  if (!defined $pid) {
+    die "fork failed before '@cmd' in $dir: $!";
+  } elsif ($pid) {
+    # parent
+    my @out = <$fh>;
+    close $fh;
+    my $exit = $?;
+    return ($exit
+	    ? { txt => \@out, fail => $exit }
+	    : { txt => \@out, ok => 1 });
+  } else {
+    chdir $dir or die "chdir $dir: $!";
+    open STDERR, '>&', \*STDOUT; # 2>&1
+    exec @cmd;
+    die "exec @cmd: failed $!";
+  }
 }
 
 1;
