@@ -49,7 +49,7 @@ The fingerprint name is printed before the path, separated by TAB.
 
 Without further configuration, fingerprints are based on the commitid
 of the root commit (i.e. with zero parents).
-See L<REPOSITORY FINGERPRINT> below.
+See L</REPOSITORY FINGERPRINT> below.
 
 =back
 
@@ -84,8 +84,18 @@ traversal.
 
 =head2 Stored state
 
-This program currently uses no externally stored state or
-configuration.
+This program requires no externally stored state or configuration.
+
+It does accept some configuration from either user-specific (--global)
+or the system-wide (--system) files.
+
+=over 4
+
+=item C<repoFingerprint.divergers>
+
+L</When different projects diverge from one root commit>
+
+=back
 
 
 =head1 REPOSITORY FINGERPRINT
@@ -110,9 +120,8 @@ earliest commit date, lowest commitid.
 
 For most repositories this should be enough.  If the master root
 commmit is shared, we will assume the repositories are checkouts of
-the same thing.
-
-TODO: Later, allow configuration of additional marker commitid whose presence will clarify in the case of repositories which have diverged from some common history.
+the same thing.  Exceptions for projects which since diverged can be
+configured.
 
 =head2 What can make a repository fingerprint change?
 
@@ -475,7 +484,9 @@ sub _run_there {
 # across filesystems
 sub get_config {
   my ($self, $key) = @_;
-  my $read = $self->_run_there('/', qw( git config ), $key);
+  my $read = $self->_run_there
+    ('/', # avoid per-repository configuration by chdir(/)
+     qw( git config ), $key);
   return unless $read->{ok};
   my $txt = join '', @{ $read->{txt} };
   chomp $txt;

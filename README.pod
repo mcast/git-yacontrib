@@ -128,6 +128,9 @@ List all commits in the repository, e.g.
 
 Search a directory tree for bare or checkout Git repositories.
 
+Optionally, fingerprint the commit tree to work out what the
+repository is I<without> relying on the directory name.
+
 =item git for-each-repo
 
 Run a command in each of the enumerated repositories.
