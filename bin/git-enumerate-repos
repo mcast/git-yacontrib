@@ -23,6 +23,36 @@ the C<PROJ.git>).
 Looks for directories containing both C<objects/> and C<refs/> or
 C<packed-refs>.
 
+=head2 Options
+
+=over 4
+
+=item --git-dir | -G
+
+List both C<.../worktree/.git> and C<.../bare.git> directories.  This
+is the default.
+
+=item --checkout | -C
+
+List toplevel work trees as C<.../worktree> , omitting trailing
+C</.git> .  Excludes bare repositories unless C<-B> is also set.
+
+=item --bare | -B
+
+List bare repositories as C<.../bare.git> , omitting clones with
+worktrees unless C<-C> is also set.
+
+=item --fingerprint | -F
+
+Use commit-tree fingerprints to identify the discovered repositories.
+The fingerprint name is printed before the path, separated by TAB.
+
+Without further configuration, fingerprints are based on the commitid
+of the root commit (i.e. with zero parents).
+See L<REPOSITORY FINGERPRINT> below.
+
+=back
+
 =head2 Output
 
 Git directories are printed one per line, once and in the first form
@@ -58,6 +88,67 @@ This program currently uses no externally stored state or
 configuration.
 
 
+=head1 REPOSITORY FINGERPRINT
+
+In order to efficiently identify repositories sharing commits, without
+chasing out the remotes to see where they match, this program attempts
+to fingerprint the commit tree.
+
+Without additional configuration, it takes
+
+=over 4
+
+=item * from the preferred branch (master, develop, devel, dev, or any
+other if they are not found)
+
+=item * the commitid of earliest root commit (ie. with zero parents)
+
+=item * taking the earliest by author date; or for tie-breaking,
+earliest commit date, lowest commitid.
+
+=back
+
+For most repositories this should be enough.  If the master root
+commmit is shared, we will assume the repositories are checkouts of
+the same thing.
+
+TODO: Later, allow configuration of additional marker commitid whose presence will clarify in the case of repositories which have diverged from some common history.
+
+=head2 What can make a repository fingerprint change?
+
+Merging older history into the preferred branch will change the
+fingerprint.  Currently this tool provides no way to configure an
+alternative or override.
+
+L<git-annex(1)> is likely to add new root commits on the C<git-annex>
+branch, and under some circumstances (which I didn't chase) these can
+be earlier than the symlinking branch.  However C<git-annex> will not
+be used as the preferred branch if C<master> etc. are present.
+
+Repositories with no commits have an arbitrary fingerprint of
+C<0000000000000000000000000000000000000000>.
+
+=head2 When different projects diverge from one root commit
+
+Suppose two projects G and J diverge from one root commit A
+
+        C---F---H---I---J              project "J"
+       /
+  A---B---D---E---G                    project "G"
+
+you can fingerprint them by the divergent commit C or D, by setting
+global (user or system) configuration like
+
+ git config --global repoFingerprint.divergers 'bbbbbb pppppp'
+
+where the value of C<repoFingerprint.divergers> is a space-separated
+list of commitid, as accepted by L<git-log(1)>, designating parent
+commit(s) like B.
+
+If the resulting fingerprint is of multiple commitid, they are sorted
+ascending and joined to make a total length of 40.
+
+
 =head1 CAVEATS
 
 There may be other tools that can do this.  Gitweb has something with
@@ -90,6 +181,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 sub main {
     local $SIG{__WARN__} = sub { warn "Warning: @_" }; # decorate the warnings from find
     my $T = Local::Trundle->new;
+    $T->getopt;
     $T->dirs_add(@ARGV);
     $T->run;
     return 0;
@@ -98,20 +190,46 @@ sub main {
 exit main();
 
 
+
 package Local::Trundle;
 use strict;
 use warnings;
 use Cwd 'abs_path';
+use Getopt::Long;
+use YAML 'Dump'; # for debug
+
 
 sub new {
   my ($class) = @_;
   my $self =
     { dirstack => [],
       seen => {}, # key=abs(dir), value=undef
+      opts => {}, # for ->getopt
       max_stack => 20_000, # arbitrary but large-ish
     };
   bless $self, $class;
   return $self;
+}
+
+sub getopt {
+  my ($self) = @_;
+  my $opts = $self->{opts};
+  GetOptions($opts, qw( bare|B checkout|C gitdir|git-dir|G quiet|q fingerprint|F ))
+    or $self->syntax;
+  $opts->{gitdir} = 'default' unless $opts->{bare} || $opts->{checkout};
+  die "--git-dir makes no sense with --bare or --checkout\n"
+    if $opts->{gitdir} && ($opts->{bare} || $opts->{checkout});
+  return;
+}
+
+sub syntax {
+  die "Syntax: git enumerate-repos [ --quiet ] [ --git-dir | --checkout | --bare ] [ --fingerprint ] <dirs>*\n\n";
+}
+
+sub noise {
+  my ($self, $fmt, @v) = @_;
+  warn sprintf($fmt, @v) unless $self->{opts}{quiet};
+  return;
 }
 
 sub run {
@@ -164,7 +282,7 @@ sub dir_scan {
 	    next;
 	}
 	if (-l _) {
-	    warn "$fn: ignored dir-symlink\n" if -d $fn;
+	  $self->noise("%s: ignored dir-symlink\n", $fn) if -d $fn;
 	} elsif (-f _) {
 	    $gitish{$leaf} = 1 if $leaf eq 'packed-refs';
 	} elsif (-d _) {
@@ -182,7 +300,7 @@ sub dir_scan {
         $self->found($dir);
 	# no recursion inside .git/
     } else {
-        $self->dirs_add(@subdir);
+        $self->dirs_add(@subdir) if @subdir;
     }
 
     return 1;
@@ -192,13 +310,176 @@ sub found {
   my ($self, $dir) = @_;
   my $abs = abs_path($dir);
   my $seens = $self->{seen};
+  my $opts = $self->{opts};
   if (exists $seens->{$abs}) {
-    warn "(skip seen) $dir\n";
+    $self->noise("(skip seen) %s\n", $dir);
   } else {
-    print "$dir\n";
+    if ($opts->{gitdir}) {
+      $self->show($dir);
+    } else {
+      my $is_bare = $self->is_bare($dir);
+      if ($is_bare) {
+	$self->show($dir) if $opts->{bare};
+      } else {
+	$dir =~ s{/\.git$}{};
+	$self->show($dir) if $opts->{checkout};
+      }
+    }
     $self->{seen}{$abs} = undef;
   }
   return;
+}
+
+sub show {
+  my ($self, $dir) = @_;
+  printf "%s\t", $self->fingerprint($dir) if $self->{opts}{fingerprint};
+  print "$dir\n";
+  return;
+}
+
+sub is_bare {
+  my ($self, $dir) = @_;
+  return 0 if -f "$dir/index"; # ugly, fast, might fib
+  my $bare = qx{ git config -f \Q$dir\E/config core.bare };
+  chomp $bare;
+  return $bare eq 'true' ? 1 : 0;
+}
+
+sub fingerprint {
+  my ($self, $dir) = @_;
+  # Check for fingerprint hints
+  my $hintedFp = $self->_fingerprint_hinted($dir);
+  return $hintedFp if defined $hintedFp;
+  # Find preferred root commit
+  my @pref_branch = qw( master develop devel dev --all );
+  foreach my $branch (@pref_branch) {
+    my $fp = $self->_fingerprint($dir, $branch);
+    return $fp if defined $fp;
+  }
+  # Got no fingerprint.  Could be no commits yet?
+  my $out = $self->_run_there($dir, qw( git branch -a ));
+  if ($out->{ok} && 0 == @{$out->{txt}}) {
+    return '0' x 40; # arbitrary value for "no commits yet"
+  }
+  die join "  ",
+    "Surprised to find no fingerprint in $dir .  Branches are\n",
+      @{$out->{txt}};
+}
+
+sub _fingerprint_hinted {
+  my ($self, $dir) = @_;
+  my $divergers = $self->{divergers} ||=
+    $self->get_config('repoFingerprint.divergers');
+  return unless defined $divergers && $divergers =~ /\S/;
+
+  my %divfrom;
+  # keys %divfrom will be commitid, children of which are the fingerprint
+  foreach my $divspec (split /\s+/, $divergers) {
+    my $find = $self->_run_there
+      ($dir, qw( git log -1 --format=%H ), $divspec);
+    next unless $find->{ok}; # not found? skip
+    my $divfound = $find->{txt};
+    chomp @$divfound;
+    @divfrom{@$divfound} = ();
+  }
+  return () unless keys %divfrom;
+
+  # List commits & parents
+  my $refind = $self->_run_there
+    ($dir, qw( git log --all ), '--format=%H %P');
+  unless ($refind->{ok}) {
+    # can't think why it would happen
+    die join "  ", "Unexpected failure in $dir listing ci2p\n",
+      @{ $refind->{txt} };
+  }
+#  my %p2ci; # key = parent_commitid, value = \@commitid
+  my @fp;
+  while (defined (my $r = shift @{ $refind->{txt} })) {
+    chomp $r;
+    my ($ci, @p) = split / /, $r;
+#    push @{ $p2ci{root} }, $ci if !@p;
+#    push @{ $p2ci{$_} }, $ci foreach @p;
+    next unless grep { exists $divfrom{$_} } @p;
+    push @fp, $ci;
+  }
+
+  @fp = keys %divfrom unless @fp;
+  # a weird case, possible when diverger(s) are branch head(s)
+
+  # Build fingerprint string
+  my @frag = sort @fp;
+  my $len = 40 - $#fp;
+  die "Need new multi-fp join rules (not enough space left for digits after joiners) on frags=(@frag)"
+    # Want enough left to make plausible uniqueness.
+    # There are other ways that would produce a perfectly nice ^\S{40}$
+    if $len < 20;
+  my $ea = int($len / @fp);
+  my $rem = $len % @fp;
+  for (my $i=0; $i<@fp; $i++) {
+    $frag[$i] = substr($frag[$i], 0, $ea + ($i<$rem ? 1 : 0));
+  }
+  my $fp = join ':', @frag;
+
+# push @fp, $fp; warn Dump({ found => $refind, fp => \@fp, divfrom => \%divfrom }); # p2ci => \%p2ci
+  return $fp;
+}
+
+sub _fingerprint {
+  my ($self, $dir, $branch) = @_;
+  my $out = $self->_run_there
+    ($dir, qw( git log --max-parents=0 ), '--format=%at %ct %H', $branch);
+  my $txt = $out->{txt}; # ARRAYref
+  if ($out->{ok}) {
+    my @par = map {
+      my @f = m{^(\d+) (\d+) ([a-f0-9]+)\Z}
+	or die "bad fp in $dir: $_";
+      \@f;
+    } @$txt;
+    @par = sort {( $a->[0] <=> $b->[0] ||
+		   $a->[1] <=> $b->[1] ||
+		   $a->[2] cmp $b->[2] )} @par;
+#    warn Dump({ par => \@par, dir => $dir, branch => $branch });
+    die "Somehow no root commits in $branch of $dir" unless @par;
+    return $par[0][2];
+  } else {
+    local $" = "\n  ";
+    #warn "fingerprint branch=$branch in dir=$dir:\n  @$txt\n";
+    return ();
+  }
+}
+
+sub _run_there {
+  my ($self, $dir, @cmd) = @_;
+  my $pid = open my $fh, '-|';
+  if (!defined $pid) {
+    die "fork failed before '@cmd' in $dir: $!";
+  } elsif ($pid) {
+    # parent
+    my @out = <$fh>;
+    close $fh;
+    my $exit = $?;
+    my @info = (dir => $dir, cmd => \@cmd, txt => \@out);
+    return ($exit
+	    ? { @info, fail => $exit }
+	    : { @info, ok => 1 });
+  } else {
+    chdir $dir or die "chdir $dir: $!";
+    open STDERR, '>&', \*STDOUT; # 2>&1
+    exec @cmd;
+    die "exec @cmd: failed $!";
+  }
+}
+
+
+# Expecting global (user or system, not repo) config because we wander
+# across filesystems
+sub get_config {
+  my ($self, $key) = @_;
+  my $read = $self->_run_there('/', qw( git config ), $key);
+  return unless $read->{ok};
+  my $txt = join '', @{ $read->{txt} };
+  chomp $txt;
+  return $txt;
 }
 
 1;

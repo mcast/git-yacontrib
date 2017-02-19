@@ -159,6 +159,8 @@ Pull noisily, or keep quiet if nothing is new
 
 For when SHA1 isn't strong enough.
 
+See also L<https://github.com/mcast/git-stronghash> .
+
 =item git which-me
 
 Which of my many email addresses am I using here?
@@ -335,14 +337,77 @@ repos.
  #
  #   if nothing to stash, just do command; else we pop an older stash!
 
+=head2 Something to install Git hooks and chains of hooks
+
+Hook chaining seems (to my searches of 2016-05) to have standardised
+on L<http://stackoverflow.com/a/8734391|.git/hooks/hook-chain> as a
+lightweight mechanism to run multiple Git hooks in a repository, often
+copied from L<https://gist.github.com/abner/cdddf155c919ff37bc9a> .
+
+On installing hooks easily (but not completely automatically for
+security reasons), projects still seem to roll their own.
+L<http://stackoverflow.com/questions/3462955/putting-git-hooks-into-repository>
+
+L<Git::Hooks> exists as a heavier and more Perl-centric mechanism.
+That doesn't appeal to me just now - I see C<@ARGV, stdio, $?> as a
+higher standard than any one language.
+
+L<https://github.com/SC5/githooks> is going in this direction, but
+still a placeholder (like this here) so far.
+
+What would be useful?
+
+Starting L<https://github.com/mcast/git-hookchains> from L<https://gist.github.com/mcast/77eb93ecda8aa4e6d410e8b6ea58a6a7> based on L<https://gist.github.com/abner/cdddf155c919ff37bc9a>.
+
+=over 4
+
+=item * Install the hooks into a clone or bare repo.
+
+From that project or another repository; copying the hooks as they
+might be audited now, or trusting pulls from the unknown future, or
+supplying a mechanism to check for updates and notify; recording the
+source branch and commitid where appropriate.
+
+=item * Install similarly chosen configuration items to .git/config
+
+This carries equivalent security risk to installing hooks.  Let's keep
+them together for the potential convenience and shared headspace.
+
+=item * Standard naming for sub-hooks.
+
+The naming scheme .git/hooks/pre-commit-001-check-my-style is clear
+and functional so I would use that.
+
+=item * Matching configuration naming for sub-hooks.
+
+Naming to allow subhooks to be given to the hook-chain by something
+like C<git config hook-config.pre-commit-001-check-my-style laconic>
+can supply data to that script.
+
+=item * git-config virtual sub-hooks?
+
+Where the subhook is implemented as a git-foo subcommand, there is no
+need to make a symlink to a shell script which calls that command.
+
+ git config subhook.pre-push-001-pushban "git _pushban --verbose"
+
+can be equivalent to
+
+ echo -e "#!/bin/sh\nexec git _pushban --verbose" > .git/hooks/pre-push-001-pushban
+ chmod a+x .git/hooks/pre-push-001-pushban
+
+if the hook-chain script will honour that.
+
+=back
+
 
 =head1 SEE ALSO
 
 =over 4
 
-=item https://metacpan.org/module/App::IsGitSynced
+=item L<https://metacpan.org/module/App::IsGitSynced>
 
-=item https://github.com/aspiers/git-config
+=item L<https://github.com/aspiers/git-config>
 
 =item Github tools
 
