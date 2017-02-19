@@ -49,6 +49,7 @@ The fingerprint name is printed before the path, separated by TAB.
 
 Without further configuration, fingerprints are based on the commitid
 of the root commit (i.e. with zero parents).
+See L<REPOSITORY FINGERPRINT> below.
 
 =back
 
@@ -126,6 +127,27 @@ be used as the preferred branch if C<master> etc. are present.
 
 Repositories with no commits have an arbitrary fingerprint of
 C<0000000000000000000000000000000000000000>.
+
+=head2 When different projects diverge from one root commit
+
+Suppose two projects G and J diverge from one root commit A
+
+        C---F---H---I---J              project "J"
+       /
+  A---B---D---E---G                    project "G"
+
+you can fingerprint them by the divergent commit C or D, by setting
+global (user or system) configuration like
+
+ git config --global repoFingerprint.divergers 'bbbbbb pppppp'
+
+where the value of C<repoFingerprint.divergers> is a space-separated
+list of commitid, as accepted by L<git-log(1)>, designating parent
+commit(s) like B.
+
+If the resulting fingerprint is of multiple commitid, they are sorted
+ascending and joined to make a total length of 40.
+
 
 =head1 CAVEATS
 
@@ -325,6 +347,10 @@ sub is_bare {
 
 sub fingerprint {
   my ($self, $dir) = @_;
+  # Check for fingerprint hints
+  my $hintedFp = $self->_fingerprint_hinted($dir);
+  return $hintedFp if defined $hintedFp;
+  # Find preferred root commit
   my @pref_branch = qw( master develop devel dev --all );
   foreach my $branch (@pref_branch) {
     my $fp = $self->_fingerprint($dir, $branch);
@@ -338,6 +364,64 @@ sub fingerprint {
   die join "  ",
     "Surprised to find no fingerprint in $dir .  Branches are\n",
       @{$out->{txt}};
+}
+
+sub _fingerprint_hinted {
+  my ($self, $dir) = @_;
+  my $divergers = $self->{divergers} ||=
+    $self->get_config('repoFingerprint.divergers');
+  return unless defined $divergers && $divergers =~ /\S/;
+
+  my %divfrom;
+  # keys %divfrom will be commitid, children of which are the fingerprint
+  foreach my $divspec (split /\s+/, $divergers) {
+    my $find = $self->_run_there
+      ($dir, qw( git log -1 --format=%H ), $divspec);
+    next unless $find->{ok}; # not found? skip
+    my $divfound = $find->{txt};
+    chomp @$divfound;
+    @divfrom{@$divfound} = ();
+  }
+  return () unless keys %divfrom;
+
+  # List commits & parents
+  my $refind = $self->_run_there
+    ($dir, qw( git log --all ), '--format=%H %P');
+  unless ($refind->{ok}) {
+    # can't think why it would happen
+    die join "  ", "Unexpected failure in $dir listing ci2p\n",
+      @{ $refind->{txt} };
+  }
+#  my %p2ci; # key = parent_commitid, value = \@commitid
+  my @fp;
+  while (defined (my $r = shift @{ $refind->{txt} })) {
+    chomp $r;
+    my ($ci, @p) = split / /, $r;
+#    push @{ $p2ci{root} }, $ci if !@p;
+#    push @{ $p2ci{$_} }, $ci foreach @p;
+    next unless grep { exists $divfrom{$_} } @p;
+    push @fp, $ci;
+  }
+
+  @fp = keys %divfrom unless @fp;
+  # a weird case, possible when diverger(s) are branch head(s)
+
+  # Build fingerprint string
+  my @frag = sort @fp;
+  my $len = 40 - $#fp;
+  die "Need new multi-fp join rules (not enough space left for digits after joiners) on frags=(@frag)"
+    # Want enough left to make plausible uniqueness.
+    # There are other ways that would produce a perfectly nice ^\S{40}$
+    if $len < 20;
+  my $ea = int($len / @fp);
+  my $rem = $len % @fp;
+  for (my $i=0; $i<@fp; $i++) {
+    $frag[$i] = substr($frag[$i], 0, $ea + ($i<$rem ? 1 : 0));
+  }
+  my $fp = join ':', @frag;
+
+# push @fp, $fp; warn Dump({ found => $refind, fp => \@fp, divfrom => \%divfrom }); # p2ci => \%p2ci
+  return $fp;
 }
 
 sub _fingerprint {
@@ -374,15 +458,28 @@ sub _run_there {
     my @out = <$fh>;
     close $fh;
     my $exit = $?;
+    my @info = (dir => $dir, cmd => \@cmd, txt => \@out);
     return ($exit
-	    ? { txt => \@out, fail => $exit }
-	    : { txt => \@out, ok => 1 });
+	    ? { @info, fail => $exit }
+	    : { @info, ok => 1 });
   } else {
     chdir $dir or die "chdir $dir: $!";
     open STDERR, '>&', \*STDOUT; # 2>&1
     exec @cmd;
     die "exec @cmd: failed $!";
   }
+}
+
+
+# Expecting global (user or system, not repo) config because we wander
+# across filesystems
+sub get_config {
+  my ($self, $key) = @_;
+  my $read = $self->_run_there('/', qw( git config ), $key);
+  return unless $read->{ok};
+  my $txt = join '', @{ $read->{txt} };
+  chomp $txt;
+  return $txt;
 }
 
 1;
