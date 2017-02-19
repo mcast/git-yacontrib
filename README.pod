@@ -357,6 +357,8 @@ still a placeholder (like this here) so far.
 
 What would be useful?
 
+Starting L<https://github.com/mcast/git-hookchains> from L<https://gist.github.com/mcast/77eb93ecda8aa4e6d410e8b6ea58a6a7> based on L<https://gist.github.com/abner/cdddf155c919ff37bc9a>.
+
 =over 4
 
 =item * Install the hooks into a clone or bare repo.
