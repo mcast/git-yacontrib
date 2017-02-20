@@ -12,6 +12,7 @@ do_inst() {
     fi
 
     ln -snv "$src/bin" "$dest/,git-yacontrib"
+    git config plumbed-in-from.PATH "$dest/,git-yacontrib" # my suggested convention
     for leaf in $( cat "$src/$instand" ); do
 	ln -snv ",git-yacontrib/$leaf" "$dest"
     done
@@ -25,6 +26,8 @@ show_skipped() {
 	<( find bin -type f -printf "%f\n" | LC_ALL=C sort )
 }
 
+unset CDPATH
+cd "$( dirname "$0" )"
 case "$1" in
     -y) do_inst "$2" install.txt ;;
     -yS) do_inst "$2" install-scary.txt ;;
