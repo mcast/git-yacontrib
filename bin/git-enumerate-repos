@@ -163,6 +163,13 @@ ascending and joined to make a total length of 40.
 There may be other tools that can do this.  Gitweb has something with
 a similar set of rules and a limit on recursion depth.
 
+Some aspects of Git directory detection may give false positives,
+false negatives or errors on unusual cases, due to shortcuts (for
+speed) or constructs from newer versions of Git.
+
+Checkouts where the C<.git> is a file pointing to a C<GIT_DIR>
+elsewhere should work, but there may be cases I haven't seen.
+
 
 =head1 AUTHOR
 
@@ -294,6 +301,7 @@ sub dir_scan {
 	  $self->noise("%s: ignored dir-symlink\n", $fn) if -d $fn;
 	} elsif (-f _) {
 	    $gitish{$leaf} = 1 if $leaf eq 'packed-refs';
+	    $self->found_maybe_submod($fn) if $leaf eq '.git';
 	} elsif (-d _) {
 	    push @subdir, $fn;
 	    $gitish{$leaf} = 1 if $leaf eq 'refs';
@@ -339,6 +347,26 @@ sub found {
   return;
 }
 
+sub found_maybe_submod {
+  my ($self, $filename) = @_;
+  if (1024 < -s $filename) {
+    $self->noise("potential submodule %s: too big\n", $filename);
+    return;
+  }
+  if (open my $fh, '<', $filename) {
+    my $txt = do { local $/; <$fh> };
+    close $fh;
+    if ($txt =~ m{\Agitdir: .+\n\z}) {
+      $self->found($filename);
+    } else {
+      $self->noise("potential submodule %s: unexpected content\n", $filename);
+    }
+  } else {
+    $self->noise("potential submodule %s: cannot read, %s", $filename, $!);
+  }
+  return;
+}
+
 sub show {
   my ($self, $dir) = @_;
   printf "%s\t", $self->fingerprint($dir) if $self->{opts}{fingerprint};
@@ -349,9 +377,13 @@ sub show {
 sub is_bare {
   my ($self, $dir) = @_;
   return 0 if -f "$dir/index"; # ugly, fast, might fib
-  my $bare = qx{ git config -f \Q$dir\E/config core.bare };
-  chomp $bare;
-  return $bare eq 'true' ? 1 : 0;
+  $dir =~ s{/\.git$}{}; # the .git can now be a file
+  my $bare = $self->_run_there($dir, qw( git config core.bare ));
+  die $self->_msg_there
+    ($bare, "Unexpected error fetching core.bare from %s\n", $dir)
+      unless $bare->{ok};
+  return 1 if @{ $bare->{txt} } == 1 && $bare->{txt}[0] eq "true\n";
+  return 0;
 }
 
 sub fingerprint {
@@ -370,9 +402,8 @@ sub fingerprint {
   if ($out->{ok} && 0 == @{$out->{txt}}) {
     return '0' x 40; # arbitrary value for "no commits yet"
   }
-  die join "  ",
-    "Surprised to find no fingerprint in $dir .  Branches are\n",
-      @{$out->{txt}};
+  die $self->_msg_there
+    ($out, "Surprised to find no fingerprint in %s .  Branches are\n", $dir);
 }
 
 sub _fingerprint_hinted {
@@ -398,8 +429,8 @@ sub _fingerprint_hinted {
     ($dir, qw( git log --all ), '--format=%H %P');
   unless ($refind->{ok}) {
     # can't think why it would happen
-    die join "  ", "Unexpected failure in $dir listing ci2p\n",
-      @{ $refind->{txt} };
+    die $self->_msg_there
+      ($refind, "Unexpected failure in %s listing ci2p\n", $dir);
   }
 #  my %p2ci; # key = parent_commitid, value = \@commitid
   my @fp;
@@ -479,6 +510,10 @@ sub _run_there {
   }
 }
 
+sub _msg_there {
+  my ($self, $ran, $fmt, @var) = @_;
+  return join '  ', sprintf($fmt, @var), @{$ran->{txt}};
+}
 
 # Expecting global (user or system, not repo) config because we wander
 # across filesystems
