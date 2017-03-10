@@ -16,7 +16,8 @@ esac
 find "$@" -type l -printf '%p\t%l\0' | \
     perl -0 -ne '
 chomp;
-m{^(.+)\t(?:\.\./)*\.git/annex/objects/\S+/SHA256\S+-([0-9a-f]{64})(?:\..*)?\Z}
-  or warn qq{[skip] Can\x27t match annex SHA256 path on "$_"\n};
-printf "%s  %s\n", $2, $1;
-'
+if (m{^(.+)\t(?:\.\./)*\.git/annex/objects/\S+/SHA256\S+-([0-9a-f]{64})(?:\..*)?\Z}) {
+  printf "%s  %s\n", $2, $1;
+} else {
+  warn qq{[skip] Can\x27t match annex SHA256 path on "$_"\n};
+}'
