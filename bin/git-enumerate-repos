@@ -157,6 +157,38 @@ commit(s) like B.
 If the resulting fingerprint is of multiple commitid, they are sorted
 ascending and joined to make a total length of 40.
 
+=head1 WARNINGS AND NOISE
+
+=over 4
+
+=item * C<%s: ignored dir-symlink>, filename
+
+To avoid circular symlinks, they are not followed.  The noise is just FYI.
+
+Git repos which are located in "strange" places for filesystm reasons,
+but placed in "convenient" symlinked locations for handy naming, may
+be visited explicitly before the dir-symlink is seen.
+
+=item * C<(skip seen) %s>, dir
+
+The same absolute path was seen and skipped when traversing a tree,
+because it had been seen earlier.
+
+=item * C<potential submodule %s: too big>, C<potential submodule %s: unexpected content>
+
+Heuristic shortcut for submodule detection failed; should not happen.
+
+=item * C<potential submodule %s: cannot read, %s>
+
+If not a file permissions problem, then my misunderstanding of file
+submodules.
+
+=item * C<cannot opendir>, C<lstat failed>
+
+Directory tree search problems, most likely file permissions.
+
+=back
+
 
 =head1 CAVEATS
 
