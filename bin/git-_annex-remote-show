@@ -1,0 +1,2 @@
+#! /bin/sh
+git show git-annex:remote.log | perl -pe 's/( cipher)=\S+/$1=xxx/g' 
