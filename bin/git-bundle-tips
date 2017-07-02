@@ -1,0 +1,27 @@
+#! /bin/bash
+# bash for pipefail
+
+set -e
+set -x
+
+set -o pipefail
+# git-log is liable to fail outside the clone
+
+bundle="$1"
+if ! [ -f "$bundle" ] || [ $# != 1 ]; then
+    printf 'Syntax: %s <file>\n
+List full commitids of branch tips from the bundle.\n
+Requires to be inside the source repository!\n' \
+    "$0"
+fi
+
+for id in $(
+    git bundle list-heads "$bundle" | cut -d' ' -f1 | sort -u
+    # tips of each ref in bundle
+); do
+    # id: appear once if unique
+    echo $id
+    # all ancestors of id, doubled
+    git log --format=%H $id | { grep -v $id || true; } | sed -e p
+done | sort | uniq -c | awk -e 'gsub(/^ +1 +/,"") { print }'
+# list the unique ones

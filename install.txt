@@ -2,6 +2,7 @@ _ssh-findagent
 git-P
 git-_annex2sha256sum
 git-br
+git-bundle-tips
 git-ci
 git-ci^
 git-co
