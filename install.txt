@@ -1,5 +1,6 @@
 _ssh-findagent
 git-P
+git-_annex-remote-show
 git-_annex2sha256sum
 git-br
 git-bundle-tips

@@ -1,2 +1,13 @@
 #! /bin/sh
+
+
+case "$1" in
+    -h | --help)
+	printf 'Syntax: %s\n
+Simplistic tool to display git-annex:remote.log with cipher info
+elided.\n' "$0" 
+    exit 1 ;;
+esac
+
+
 git show git-annex:remote.log | perl -pe 's/( cipher)=\S+/$1=xxx/g' 
