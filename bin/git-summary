@@ -1,0 +1,61 @@
+#! /bin/sh
+
+_state_colour() {
+    range_min=$1
+    range_max=$2
+    range_in=$3
+    range_out=$4
+    key=$5
+    val=$6
+    if [ "$val" -lt "$range_min" ] || [ "$val" -gt "$range_max" ]; then
+	printf "\033[%sm %s \033[m" "$range_out" "$key:$val"
+    else
+	printf "\033[%sm %s \033[m" "$range_in" "$key:$val"
+    fi
+}
+
+_config_unusual() {
+    git config -l --local | perl -lne 'BEGIN {
+   my @norm = qw{ core.repositoryformatversion=0 core.filemode=true core.bare=false core.logallrefupdates=true };
+   push @norm, qw{ remote.origin.fetch=+refs/heads/*:refs/remotes/origin/* };
+   @normal{@norm} = ();
+   @ignore{qw{ remote.origin.url }} = ();
+ }
+ next if               exists $normal{$_};
+ next if m{^(.*?)=} && exists $ignore{$1};
+ next if m{^branch\.(\S+)\.remote=origin$};
+ next if m{^branch\.(\S+)\.merge=refs/heads/\1$};
+ print'
+
+}
+
+# numeric part of ANSI \x1B[...m code
+good='32;7'
+bad=41
+hmmm='33;7'
+
+# things to consider about a repo
+num_stashes=$( git stash list     | wc -l )
+num_remotes=$( git remote show -n | wc -l )
+num_ignored=$( git clean -Xdn     | wc -l )
+num_cruft=$(   git clean -dn      | wc -l )
+
+num_unusual_config=$( _config_unusual | wc -l )
+
+
+printf "%-40s:" "$( pwd )"
+printf " %s" \
+       "$( _state_colour 0 0 $good $bad  stash   $num_stashes )" \
+       "$( _state_colour 1 5 $good $bad  remote  $num_remotes )" \
+       "$( _state_colour 0 0 $good $bad  cruft   $num_cruft   )" \
+       "$( _state_colour 0 0 $good $hmmm ignored $num_ignored )" \
+       "$( _state_colour 0 0 $good $hmmm unusual_config $num_unusual_config )" \
+       "$( _state_colour 0 0 $good $bad  ?unpushed? -1 )"
+printf "\n"
+
+# other things to consider,
+#   tags being pushed; per remote
+#   branches being pushed; per remote
+#   branches
+
+_config_unusual
