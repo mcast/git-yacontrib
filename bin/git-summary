@@ -1,16 +1,22 @@
 #! /bin/sh
 
+verbose=
+
 _state_colour() {
     range_min=$1
     range_max=$2
     range_in=$3
     range_out=$4
     key=$5
-    val=$6
-    if [ "$val" -lt "$range_min" ] || [ "$val" -gt "$range_max" ]; then
-	printf "\033[%sm %s \033[m" "$range_out" "$key:$val"
+    val="$( cat; echo extra line fixes linecount after trailing newline removed )"
+    nval="$( printf "%s" "$val" | wc -l )"
+    if [ "$nval" -lt "$range_min" ] || [ "$nval" -gt "$range_max" ]; then
+	[ -n "$verbose" ] && printf '\n'
+	printf " \033[%sm %s \033[m" "$range_out" "$key:$nval"
+	[ -n "$verbose" ] && printf '\n'
+	[ -n "$verbose" ] && printf "%s\n" "$val" | head -n-1 | sed -e 's/^/  /'
     else
-	printf "\033[%sm %s \033[m" "$range_in" "$key:$val"
+	printf " \033[%sm %s \033[m" "$range_in" "$key:$nval"
     fi
 }
 
@@ -29,33 +35,32 @@ _config_unusual() {
 
 }
 
+_status() {
+    git status --porcelain=1 --untracked=all --ignored=matching
+}
+
+_print_match() {
+    perl -ne "print if s{$1}{}"
+}
+
 # numeric part of ANSI \x1B[...m code
 good='32;7'
 bad=41
 hmmm='33;7'
 
-# things to consider about a repo
-num_stashes=$( git stash list     | wc -l )
-num_remotes=$( git remote show -n | wc -l )
-num_ignored=$( git clean -Xdn     | wc -l )
-num_cruft=$(   git clean -dn      | wc -l )
-
-num_unusual_config=$( _config_unusual | wc -l )
-
-
 printf "%-40s:" "$( pwd )"
-printf " %s" \
-       "$( _state_colour 0 0 $good $bad  stash   $num_stashes )" \
-       "$( _state_colour 1 5 $good $bad  remote  $num_remotes )" \
-       "$( _state_colour 0 0 $good $bad  cruft   $num_cruft   )" \
-       "$( _state_colour 0 0 $good $hmmm ignored $num_ignored )" \
-       "$( _state_colour 0 0 $good $hmmm unusual_config $num_unusual_config )" \
-       "$( _state_colour 0 0 $good $bad  ?unpushed? -1 )"
+
+# things to consider about a repo
+git stash list     | _state_colour 0 0 $good $bad  stashes
+git remote show -n | _state_colour 1 5 $good $bad  remote
+_status | _print_match '^[?][?] ' | _state_colour 0 0 $good $bad  cruft
+_status | _print_match '^!! '     | _state_colour 0 0 $good $hmmm ignored
+_config_unusual    | _state_colour 0 0 $good $hmmm unusual_config
+#  _state_colour 0 0 $good $bad  ?unpushed?
+
 printf "\n"
 
 # other things to consider,
 #   tags being pushed; per remote
 #   branches being pushed; per remote
 #   branches
-
-_config_unusual
