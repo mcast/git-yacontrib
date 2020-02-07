@@ -71,7 +71,7 @@ ll_check_version() {
     elif ! [ -w '.git/HEAD' ]; then
 	printf "%s: %s does not look writable\n" "$prog" "$PWD" >&2
 	false
-    elif incomplete="$( git config --get git-ll.incomplete )"; then
+    elif incomplete="$( git config --get git-ll.incomplete )" && [ -n "$incomplete" ]; then
         printf "Found %s has incomplete initialisation (git-ll.incomplete=%s)\n Please fix or delete & start again\n" \
             "$PWD" "$incomplete"
         false
@@ -198,7 +198,7 @@ ll_main() {
 	# 2) perl5
 	lldir="$PERL_LOCAL_LIB_ROOT"
 	llrel="/"
-    elif lldir="$( git config --get git-ll.dir )"; then
+    elif lldir="$( git config --get git-ll.dir )" && [ -n "$lldir" ]; then
 	# 4) read config - global or a work tree
 	llrel="$( cd_to_toplevel && pwd )" || \
 	    die "Cannot find top of work tree from $PWD"
