@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /bin/bash
+# Bash for [ =~ ]
 
 NONGIT_OK=1
 OPTIONS_SPEC="\
@@ -193,7 +194,7 @@ ll_main() {
     if [ -n "$lldir" ]; then
 	# 1) -L option, done
 	:
-    elif [ -n "$PERL_LOCAL_LIB_ROOT" ] && [ ",$lllang," =~ ,perl5, ]; then
+    elif [ -n "$PERL_LOCAL_LIB_ROOT" ] && [[ ",$lllang," =~ ,perl5, ]]; then
 	# 2) perl5
 	lldir="$PERL_LOCAL_LIB_ROOT"
 	llrel="/"
