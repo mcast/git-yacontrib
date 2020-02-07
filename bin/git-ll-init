@@ -117,8 +117,20 @@ ll_create_done() {
 }
 
 ll_setup_perl5() {
-    # XXX: deal with absence of local::lib
-    perl "-Mlocal::lib=." > perl5.sh
+    if perl "-Mlocal::lib=." > perl5.sh+; then
+	# ok
+	mv perl5.sh+ perl5.sh
+    else
+	echo local::lib not found using $( which perl ), try to install it with cpanm
+	cpanm -l "$PWD" local::lib
+	git add $verb_v lib man
+	git commit $verb_q -m "(+) semi-bootstrap install local::lib
+
+ using $( which cpanm )
+ under $( which perl )"
+	perl -I lib/perl5 "-Mlocal::lib=." > perl5.sh+
+	mv perl5.sh+ perl5.sh
+    fi
     # XXX: also need cpanm & some config
 }
 
