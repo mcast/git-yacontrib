@@ -23,7 +23,10 @@ do_inst() {
     instand="$2"
     if [ -z "$dest" ]; then
 	dest="$( git config plumbed-in-from.PATH )"
-	[ -z "$dest" ] && show_syntax
+	if [ -z "$dest" ]; then
+	    show_syntax
+	    exit 1
+	fi
 	dest="$( dirname "$dest" )"
 	echo "Using previous install directory $dest"
     fi
