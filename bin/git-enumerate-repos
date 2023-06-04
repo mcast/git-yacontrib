@@ -424,7 +424,7 @@ sub fingerprint {
   my $hintedFp = $self->_fingerprint_hinted($dir);
   return $hintedFp if defined $hintedFp;
   # Find preferred root commit
-  my @pref_branch = qw( master develop devel dev --all );
+  my @pref_branch = qw( main master develop devel dev --all );
   foreach my $branch (@pref_branch) {
     my $fp = $self->_fingerprint($dir, $branch);
     return $fp if defined $fp;
@@ -512,8 +512,8 @@ sub _fingerprint {
 		   $a->[2] cmp $b->[2] )} @par;
 #    warn Dump({ par => \@par, dir => $dir, branch => $branch });
     if (!@par) {
-      $self->noise("Somehow no root commits in $branch of $dir");
-      return 'nil';
+      $self->noise("%s: Somehow no root commits in branch %s", $dir, $branch);
+      return ();
     }
     return $par[0][2];
   } else {
