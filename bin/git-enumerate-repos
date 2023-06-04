@@ -511,7 +511,10 @@ sub _fingerprint {
 		   $a->[1] <=> $b->[1] ||
 		   $a->[2] cmp $b->[2] )} @par;
 #    warn Dump({ par => \@par, dir => $dir, branch => $branch });
-    die "Somehow no root commits in $branch of $dir" unless @par;
+    if (!@par) {
+      $self->noise("Somehow no root commits in $branch of $dir");
+      return 'nil';
+    }
     return $par[0][2];
   } else {
     local $" = "\n  ";
